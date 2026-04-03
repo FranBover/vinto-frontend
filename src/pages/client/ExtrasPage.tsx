@@ -23,7 +23,7 @@ export default function ExtrasPage() {
 
   const menu = slug ? data[slug] : null
   const prodId = productoId ? parseInt(productoId, 10) : null
-  const producto = menu?.productos.find(p => p.id === prodId)
+  const producto = menu?.categorias.flatMap(c => c.productos).find(p => p.id === prodId)
 
   if (!menu || !producto) {
     return (

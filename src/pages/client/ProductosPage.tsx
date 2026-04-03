@@ -15,7 +15,7 @@ export default function ProductosPage() {
   const menu = slug ? data[slug] : null
   const catId = categoriaId ? parseInt(categoriaId, 10) : null
   const categoria = menu?.categorias.find(c => c.id === catId)
-  const productos = menu?.productos.filter(p => p.categoriaId === catId && p.disponible) ?? []
+  const productos = categoria?.productos.filter(p => p.disponible) ?? []
 
   if (loading && !menu) {
     return (

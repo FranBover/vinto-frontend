@@ -34,8 +34,8 @@ export default function MenuPage() {
     )
   }
 
-  const { local, categorias, productos } = menu
-  const isOpen = local.esAbierto
+  const { local, categorias } = menu
+  const isOpen = local.esActivo
 
   return (
     <div className="min-h-screen bg-white text-[#1a1a1a] font-sans pb-20">
@@ -148,7 +148,7 @@ export default function MenuPage() {
       {/* ── Category list ──────────────────────────────────────── */}
       <ul>
         {categorias.map((cat, idx) => {
-          const count = productos.filter(p => p.categoriaId === cat.id).length
+          const count = cat.productos.length
           const disabled = !isOpen
 
           return (
@@ -197,7 +197,7 @@ export default function MenuPage() {
                   Teléfono / WhatsApp
                 </p>
                 <a
-                  href={local.linkWhatsapp}
+                  href={local.linkWhatsapp ?? undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-bold text-[#2d5a27] underline text-sm"

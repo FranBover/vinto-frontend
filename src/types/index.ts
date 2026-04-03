@@ -95,8 +95,23 @@ export interface UpdateEstadoDto {
 
 // ── Menu público ──────────────────────────────────────────────────────────────
 
-export interface MenuPublico {
-  local: Administrador
-  categorias: Categoria[]
+export interface LocalPublico {
+  id: number
+  nombreLocal: string
+  telefono: string
+  linkWhatsapp: string | null
+  logoUrl: string | null
+  direccion: string
+  esActivo: boolean
+}
+
+export interface CategoriaPublica {
+  id: number
+  nombre: string
   productos: Producto[]
+}
+
+export interface MenuPublico {
+  local: LocalPublico
+  categorias: CategoriaPublica[]
 }

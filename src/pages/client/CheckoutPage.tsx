@@ -64,7 +64,7 @@ export default function CheckoutPage() {
     }
 
     try {
-      const pedido = await crearPedido(dto)
+      const pedido = await crearPedido(slug!, dto)
       navigate(`/${slug}/confirmacion`, { state: { pedido, local: menu.local } })
     } catch {
       setError('No se pudo enviar el pedido. Revisá tu conexión e intentá de nuevo.')
