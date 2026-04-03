@@ -1,121 +1,54 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { useAuthStore } from './store/authStore'
 
-function App() {
-  const [count, setCount] = useState(0)
+import MenuPage from './pages/client/MenuPage'
+import ProductosPage from './pages/client/ProductosPage'
+import ExtrasPage from './pages/client/ExtrasPage'
+import CarritoPage from './pages/client/CarritoPage'
+import CheckoutPage from './pages/client/CheckoutPage'
+import ConfirmacionPage from './pages/client/ConfirmacionPage'
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+import LoginPage from './pages/admin/LoginPage'
+import PedidosPage from './pages/admin/PedidosPage'
+import PedidoDetallePage from './pages/admin/PedidoDetallePage'
+import AdminProductosPage from './pages/admin/ProductosPage'
+import CategoriasPage from './pages/admin/CategoriasPage'
+import ReportesPage from './pages/admin/ReportesPage'
+import MiLocalPage from './pages/admin/MiLocalPage'
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function ProtectedRoute() {
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  return isAuthenticated() ? <Outlet /> : <Navigate to="/admin/login" replace />
 }
 
-export default App
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* ── Cliente ──────────────────────────────────────────── */}
+        <Route path="/:slug" element={<MenuPage />} />
+        <Route path="/:slug/productos/:categoriaId" element={<ProductosPage />} />
+        <Route path="/:slug/productos/:categoriaId/:productoId" element={<ExtrasPage />} />
+        <Route path="/:slug/carrito" element={<CarritoPage />} />
+        <Route path="/:slug/checkout" element={<CheckoutPage />} />
+        <Route path="/:slug/confirmacion" element={<ConfirmacionPage />} />
+
+        {/* ── Admin público ─────────────────────────────────────── */}
+        <Route path="/admin/login" element={<LoginPage />} />
+
+        {/* ── Admin protegido ───────────────────────────────────── */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/admin/pedidos" element={<PedidosPage />} />
+          <Route path="/admin/pedidos/:id" element={<PedidoDetallePage />} />
+          <Route path="/admin/productos" element={<AdminProductosPage />} />
+          <Route path="/admin/categorias" element={<CategoriasPage />} />
+          <Route path="/admin/reportes" element={<ReportesPage />} />
+          <Route path="/admin/mi-local" element={<MiLocalPage />} />
+        </Route>
+
+        {/* ── Fallback ──────────────────────────────────────────── */}
+        <Route path="*" element={<Navigate to="/admin/login" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
