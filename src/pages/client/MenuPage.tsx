@@ -6,7 +6,7 @@ import CartBar from '../../components/client/CartBar'
 export default function MenuPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
-  const { data, loading, error, fetchMenu } = useMenuStore()
+  const { data, loading, error, fetchMenu, clearCache } = useMenuStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
 
@@ -26,10 +26,16 @@ export default function MenuPage() {
 
   if (error || !menu) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white px-8">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white px-8 gap-4">
         <p className="text-sm text-[#1a1a1a] text-center">
           {error ?? 'Menú no disponible.'}
         </p>
+        <button
+          onClick={() => { clearCache(); if (slug) fetchMenu(slug) }}
+          className="text-sm font-bold underline text-[#2d5a27]"
+        >
+          Reintentar
+        </button>
       </div>
     )
   }

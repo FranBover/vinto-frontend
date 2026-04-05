@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import AdminLayout from '../../components/admin/AdminLayout'
 import {
   getProductos, createProducto, updateProducto,
-  getCategorias, createExtra, deleteExtra,
+  getCategorias, getExtras, createExtra, deleteExtra,
 } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
 import type { Producto, Categoria, ProductoExtra } from '../../types'
@@ -60,7 +60,7 @@ export default function ProductosAdminPage() {
     setDrawerOpen(true)
   }
 
-  function openEdit(p: Producto) {
+  async function openEdit(p: Producto) {
     setEditingProducto(p)
     setForm({
       nombre: p.nombre,
@@ -70,8 +70,9 @@ export default function ProductosAdminPage() {
       disponible: p.disponible,
       imagenUrl: p.imagenUrl ?? '',
     })
-    setExtras(p.extras ?? [])
     setDrawerOpen(true)
+    const freshExtras = await getExtras(p.id)
+    setExtras(freshExtras)
   }
 
   function closeDrawer() {
@@ -96,14 +97,14 @@ export default function ProductosAdminPage() {
       }
       if (editingProducto) {
         const updated = await updateProducto(editingProducto.id, payload)
-        setProductos(prev => prev.map(p => p.id === updated.id ? { ...updated, extras } : p))
         setEditingProducto({ ...updated, extras })
       } else {
         const created = await createProducto({ ...payload, administradorId: adminId } as Parameters<typeof createProducto>[0])
-        setProductos(prev => [...prev, { ...created, extras: [] }])
         setEditingProducto({ ...created, extras: [] })
         setExtras([])
       }
+      const fresh = await getProductos(adminId)
+      setProductos(fresh)
     } finally {
       setSaving(false)
     }
@@ -113,14 +114,14 @@ export default function ProductosAdminPage() {
     if (!editingProducto || !newExtraNombre.trim()) return
     setAddingExtra(true)
     try {
-      const extra = await createExtra({
+      await createExtra({
         nombre: newExtraNombre.trim(),
         precioAdicional: parseFloat(newExtraPrecio) || 0,
         productoId: editingProducto.id,
       })
-      const newExtras = [...extras, extra as ProductoExtra]
-      setExtras(newExtras)
-      setProductos(prev => prev.map(p => p.id === editingProducto.id ? { ...p, extras: newExtras } : p))
+      const freshExtras = await getExtras(editingProducto.id)
+      setExtras(freshExtras)
+      setProductos(prev => prev.map(p => p.id === editingProducto.id ? { ...p, extras: freshExtras } : p))
       setNewExtraNombre('')
       setNewExtraPrecio('')
     } finally {
@@ -129,12 +130,11 @@ export default function ProductosAdminPage() {
   }
 
   const handleDeleteExtra = async (extraId: number) => {
+    if (!editingProducto) return
     await deleteExtra(extraId)
-    const newExtras = extras.filter(e => e.id !== extraId)
-    setExtras(newExtras)
-    if (editingProducto) {
-      setProductos(prev => prev.map(p => p.id === editingProducto.id ? { ...p, extras: newExtras } : p))
-    }
+    const freshExtras = await getExtras(editingProducto.id)
+    setExtras(freshExtras)
+    setProductos(prev => prev.map(p => p.id === editingProducto.id ? { ...p, extras: freshExtras } : p))
   }
 
   const categoriaNombre = (id: number) =>

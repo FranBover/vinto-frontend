@@ -78,9 +78,12 @@ export default function CheckoutPage() {
           local: menu.local,
           items,
           nombreCliente: nombre.trim(),
+          telefono: telefono.trim(),
           formaPago,
           formaEntrega,
           direccionCliente: formaEntrega === 'Delivery' ? direccion.trim() : undefined,
+          referencia: formaEntrega === 'Delivery' && referencia.trim() ? referencia.trim() : undefined,
+          montoPagoEfectivo: formaPago === 'Efectivo' && montoPago ? parseFloat(montoPago) : undefined,
         },
       })
     } catch {

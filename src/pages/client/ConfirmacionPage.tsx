@@ -9,9 +9,12 @@ interface LocationState {
   local: LocalPublico
   items: CartItem[]
   nombreCliente: string
+  telefono: string
   formaPago: FormaPago
   formaEntrega: FormaEntrega
   direccionCliente?: string
+  referencia?: string
+  montoPagoEfectivo?: number
 }
 
 const LABEL_PAGO: Record<FormaPago, string> = {
@@ -23,6 +26,67 @@ const LABEL_PAGO: Record<FormaPago, string> = {
 const LABEL_ENTREGA: Record<FormaEntrega, string> = {
   Local: 'Retiro en local',
   Delivery: 'Delivery',
+}
+
+const pesos = (n: number) => `$${n.toLocaleString('es-AR')}`
+
+function formatFecha(): string {
+  const now = new Date()
+  const dd = String(now.getDate()).padStart(2, '0')
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const yy = String(now.getFullYear()).slice(2)
+  const hh = String(now.getHours()).padStart(2, '0')
+  const min = String(now.getMinutes()).padStart(2, '0')
+  return `${dd}/${mm}/${yy} - ${hh}:${min} hs`
+}
+
+function buildWhatsAppText(state: LocationState): string {
+  const { pedido, local, items, nombreCliente, telefono, formaPago,
+          formaEntrega, direccionCliente, referencia, montoPagoEfectivo } = state
+
+  const lines: string[] = []
+
+  lines.push('*¡Hola! Te paso el resumen de mi pedido* 🛍️')
+  lines.push('')
+  lines.push(`*Pedido:* #${pedido.codigoSeguimiento}`)
+  lines.push(`*Local:* ${local.nombreLocal}`)
+  lines.push(`*Fecha:* ${formatFecha()}`)
+  lines.push('')
+  lines.push(`*Cliente:* ${nombreCliente}`)
+  lines.push(`*Teléfono:* ${telefono}`)
+  lines.push('')
+  lines.push(`*Forma de pago:* ${LABEL_PAGO[formaPago]}`)
+  if (formaPago === 'Efectivo' && montoPagoEfectivo) {
+    lines.push(`*Paga con:* ${pesos(montoPagoEfectivo)}`)
+  }
+  if (formaPago === 'Transferencia') {
+    if (local.aliasTransferencia) lines.push(`*Alias:* ${local.aliasTransferencia}`)
+    if (local.titularCuenta) lines.push(`*Titular:* ${local.titularCuenta}`)
+  }
+  lines.push('')
+  lines.push(`*Entrega:* ${LABEL_ENTREGA[formaEntrega]}`)
+  if (formaEntrega === 'Delivery') {
+    if (direccionCliente) lines.push(`*Dirección:* ${direccionCliente}`)
+    if (referencia) lines.push(`*Referencia:* ${referencia}`)
+  }
+  lines.push('')
+  lines.push('*Productos:*')
+  for (const item of items) {
+    const precioUnitario = item.producto.precio + item.extras.reduce((s, e) => s + e.precioAdicional, 0)
+    lines.push(`${item.cantidad}x ${item.producto.nombre}: ${pesos(precioUnitario * item.cantidad)}`)
+    for (const extra of item.extras) {
+      lines.push(`  + ${extra.nombre}: ${pesos(extra.precioAdicional)}`)
+    }
+  }
+  lines.push('')
+  if (pedido.subtotal !== pedido.total) {
+    lines.push(`*Subtotal:* ${pesos(pedido.subtotal)}`)
+  }
+  lines.push(`*Total:* ${pesos(pedido.total)}`)
+  lines.push('')
+  lines.push('_¡Espero tu confirmación!_ ✅')
+
+  return encodeURIComponent(lines.join('\n'))
 }
 
 function getWhatsAppNumber(linkWhatsapp: string | null): string | null {
@@ -40,19 +104,13 @@ export default function ConfirmacionPage() {
   const limpiarCarrito = useCartStore(s => s.limpiarCarrito)
 
   const state = location.state as LocationState | null
-  const pedido = state?.pedido
-  const local = state?.local
-  const nombreCliente = state?.nombreCliente
-  const formaPago = state?.formaPago
-  const formaEntrega = state?.formaEntrega
-  const direccionCliente = state?.direccionCliente
 
   useEffect(() => {
     limpiarCarrito()
   }, [limpiarCarrito])
 
   // Fallback: navegación directa sin state
-  if (!pedido || !local) {
+  if (!state?.pedido || !state?.local) {
     return (
       <div className="min-h-screen bg-white text-[#1a1a1a] font-sans flex flex-col items-center justify-center px-8 gap-6">
         <p className="font-bold text-lg text-center">¡Pedido recibido!</p>
@@ -69,9 +127,11 @@ export default function ConfirmacionPage() {
     )
   }
 
+  const { pedido, local, formaPago, formaEntrega, nombreCliente, direccionCliente } = state
+
   const waNumber = getWhatsAppNumber(local.linkWhatsapp)
   const waLink = waNumber
-    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(pedido.resumenWhatsApp)}`
+    ? `https://wa.me/${waNumber}?text=${buildWhatsAppText(state)}`
     : null
 
   return (

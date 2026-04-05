@@ -4,6 +4,7 @@ import type {
   UpdateEstadoDto,
   Producto,
   Categoria,
+  ProductoExtra,
 } from '../types'
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -74,13 +75,18 @@ export const deleteCategoria = async (id: number): Promise<void> => {
 
 // ── Extras ────────────────────────────────────────────────────────────────────
 
-export const createExtra = async (extra: { nombre: string; precioAdicional: number; productoId: number }) => {
-  const { data } = await apiClient.post('/extras', extra)
+export const getExtras = async (productoId: number): Promise<ProductoExtra[]> => {
+  const { data } = await apiClient.get<ProductoExtra[]>(`/ProductoExtra/por-producto/${productoId}`)
+  return data
+}
+
+export const createExtra = async (extra: { nombre: string; precioAdicional: number; productoId: number }): Promise<ProductoExtra> => {
+  const { data } = await apiClient.post<ProductoExtra>('/ProductoExtra', extra)
   return data
 }
 
 export const deleteExtra = async (id: number): Promise<void> => {
-  await apiClient.delete(`/extras/${id}`)
+  await apiClient.delete(`/ProductoExtra/${id}`)
 }
 
 // ── Administrador ─────────────────────────────────────────────────────────────
@@ -99,6 +105,20 @@ export const updateAdministrador = async (id: number, payload: Partial<{
   esAbierto: boolean
 }>) => {
   const { data } = await apiClient.put(`/administrador/${id}`, payload)
+  return data
+}
+
+export const updateLocalData = async (id: number, payload: {
+  nombreLocal: string
+  telefono: string
+  direccion: string
+  linkWhatsapp: string
+  logoUrl: string
+  esActivo: boolean
+  aliasTransferencia: string
+  titularCuenta: string
+}) => {
+  const { data } = await apiClient.patch(`/Administrador/${id}/local`, payload)
   return data
 }
 

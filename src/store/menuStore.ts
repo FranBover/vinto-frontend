@@ -7,6 +7,7 @@ interface MenuState {
   loading: boolean
   error: string | null
   fetchMenu: (slug: string) => Promise<void>
+  clearCache: () => void
 }
 
 export const useMenuStore = create<MenuState>((set, get) => ({
@@ -24,4 +25,6 @@ export const useMenuStore = create<MenuState>((set, get) => ({
       set({ loading: false, error: 'No se pudo cargar el menú' })
     }
   },
+
+  clearCache: () => set({ data: {}, error: null }),
 }))

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from '../../components/admin/AdminLayout'
-import { getAdministrador, updateAdministrador } from '../../api/adminApi'
+import { getAdministrador, updateLocalData } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
 import type { Administrador } from '../../types'
 
@@ -18,24 +18,28 @@ export default function MiLocalPage() {
   const [error, setError] = useState<string | null>(null)
 
   // Form fields
-  const [esAbierto, setEsAbierto] = useState(false)
+  const [esActivo, setEsActivo] = useState(false)
   const [nombreLocal, setNombreLocal] = useState('')
   const [telefono, setTelefono] = useState('')
   const [direccion, setDireccion] = useState('')
   const [linkWhatsapp, setLinkWhatsapp] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
+  const [aliasTransferencia, setAliasTransferencia] = useState('')
+  const [titularCuenta, setTitularCuenta] = useState('')
 
   useEffect(() => {
     if (!adminId) return
     getAdministrador(adminId)
       .then((a: Administrador) => {
         setAdmin(a)
-        setEsAbierto(a.esAbierto)
+        setEsActivo(a.esAbierto)
         setNombreLocal(a.nombreLocal)
         setTelefono(a.telefono)
         setDireccion(a.direccion)
         setLinkWhatsapp(a.linkWhatsapp ?? '')
         setLogoUrl(a.logoUrl ?? '')
+        setAliasTransferencia(a.aliasTransferencia ?? '')
+        setTitularCuenta(a.titularCuenta ?? '')
       })
       .catch(() => setError('No se pudieron cargar los datos del local.'))
       .finally(() => setLoading(false))
@@ -46,18 +50,20 @@ export default function MiLocalPage() {
     if (!adminId) return
     setSaving(true)
     setError(null)
+    setSavedMsg(false)
     try {
-      const updated = await updateAdministrador(adminId, {
-        esAbierto,
+      await updateLocalData(adminId, {
+        esActivo,
         nombreLocal: nombreLocal.trim(),
         telefono: telefono.trim(),
         direccion: direccion.trim(),
         linkWhatsapp: linkWhatsapp.trim(),
         logoUrl: logoUrl.trim(),
+        aliasTransferencia: aliasTransferencia.trim(),
+        titularCuenta: titularCuenta.trim(),
       })
-      setAdmin(updated as Administrador)
       setSavedMsg(true)
-      setTimeout(() => setSavedMsg(false), 2500)
+      setTimeout(() => setSavedMsg(false), 3000)
     } catch {
       setError('No se pudo guardar. Intentá de nuevo.')
     } finally {
@@ -76,7 +82,7 @@ export default function MiLocalPage() {
           className="text-sm font-bold text-white px-5 py-2.5 rounded-none disabled:opacity-50 transition-colors"
           style={{ backgroundColor: saving ? '#aaa' : '#2d5a27' }}
         >
-          {saving ? 'Guardando…' : savedMsg ? '¡Guardado!' : 'Guardar cambios'}
+          {saving ? 'Guardando…' : 'Guardar cambios'}
         </button>
       }
     >
@@ -86,28 +92,26 @@ export default function MiLocalPage() {
         <form id="mi-local-form" onSubmit={handleSave} className="max-w-lg space-y-6">
 
           {/* Abierto/Cerrado toggle */}
-          <div
-            className="border border-[#e8e8e8] bg-white px-6 py-5 flex items-center justify-between"
-          >
+          <div className="border border-[#e8e8e8] bg-white px-6 py-5 flex items-center justify-between">
             <div>
-              <p className="font-bold text-[15px]">{esAbierto ? 'Local abierto' : 'Local cerrado'}</p>
+              <p className="font-bold text-[15px]">{esActivo ? 'Local abierto' : 'Local cerrado'}</p>
               <p className="text-sm text-[#aaa] mt-0.5">
-                {esAbierto
+                {esActivo
                   ? 'Los clientes pueden hacer pedidos ahora.'
                   : 'El local no acepta pedidos en este momento.'}
               </p>
             </div>
             <button
               type="button"
-              onClick={() => setEsAbierto(v => !v)}
+              onClick={() => setEsActivo(v => !v)}
               className="relative flex-shrink-0 ml-6"
               style={{ width: 52, height: 28 }}
-              aria-pressed={esAbierto}
+              aria-pressed={esActivo}
             >
               <span
                 className="block w-full h-full transition-colors"
                 style={{
-                  backgroundColor: esAbierto ? '#2d5a27' : '#d0d0d0',
+                  backgroundColor: esActivo ? '#2d5a27' : '#d0d0d0',
                   borderRadius: 0,
                 }}
               />
@@ -116,7 +120,7 @@ export default function MiLocalPage() {
                 style={{
                   width: 20,
                   height: 20,
-                  left: esAbierto ? 28 : 4,
+                  left: esActivo ? 28 : 4,
                   borderRadius: 0,
                 }}
               />
@@ -125,6 +129,10 @@ export default function MiLocalPage() {
 
           {error && (
             <p className="text-sm text-red-600">{error}</p>
+          )}
+
+          {savedMsg && (
+            <p className="text-sm font-bold text-[#2d5a27]">Cambios guardados</p>
           )}
 
           {/* Fields */}
@@ -163,6 +171,24 @@ export default function MiLocalPage() {
                 value={linkWhatsapp}
                 onChange={e => setLinkWhatsapp(e.target.value)}
                 placeholder="https://wa.me/..."
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Alias de transferencia</label>
+              <input
+                className={inputCls}
+                value={aliasTransferencia}
+                onChange={e => setAliasTransferencia(e.target.value)}
+                placeholder="mi.alias"
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Titular de la cuenta</label>
+              <input
+                className={inputCls}
+                value={titularCuenta}
+                onChange={e => setTitularCuenta(e.target.value)}
+                placeholder="Juan Pérez"
               />
             </div>
             <div>

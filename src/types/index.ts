@@ -11,6 +11,8 @@ export interface Administrador {
   logoUrl: string
   esActivo: boolean
   esAbierto: boolean
+  aliasTransferencia: string | null
+  titularCuenta: string | null
 }
 
 export interface Categoria {
@@ -116,6 +118,8 @@ export interface LocalPublico {
   logoUrl: string | null
   direccion: string
   esActivo: boolean
+  aliasTransferencia: string | null
+  titularCuenta: string | null
 }
 
 export interface CategoriaPublica {
