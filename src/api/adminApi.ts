@@ -9,7 +9,7 @@ import type {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export const loginAdmin = async (email: string, password: string): Promise<{ token: string }> => {
-  const { data } = await apiClient.post<{ token: string }>('/auth/login', { email, password })
+  const { data } = await apiClient.post<{ token: string }>('/auth/login', { email, contraseña: password })
   return data
 }
 
@@ -70,6 +70,36 @@ export const updateCategoria = async (id: number, categoria: Partial<Omit<Catego
 
 export const deleteCategoria = async (id: number): Promise<void> => {
   await apiClient.delete(`/categorias/${id}`)
+}
+
+// ── Extras ────────────────────────────────────────────────────────────────────
+
+export const createExtra = async (extra: { nombre: string; precioAdicional: number; productoId: number }) => {
+  const { data } = await apiClient.post('/extras', extra)
+  return data
+}
+
+export const deleteExtra = async (id: number): Promise<void> => {
+  await apiClient.delete(`/extras/${id}`)
+}
+
+// ── Administrador ─────────────────────────────────────────────────────────────
+
+export const getAdministrador = async (id: number) => {
+  const { data } = await apiClient.get(`/Administrador/${id}`)
+  return data
+}
+
+export const updateAdministrador = async (id: number, payload: Partial<{
+  nombreLocal: string
+  telefono: string
+  direccion: string
+  linkWhatsapp: string
+  logoUrl: string
+  esAbierto: boolean
+}>) => {
+  const { data } = await apiClient.put(`/administrador/${id}`, payload)
+  return data
 }
 
 // ── Reportes ──────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../../store/cartStore'
 import { useMenuStore } from '../../store/menuStore'
@@ -29,14 +29,21 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null)
 
   // Redirect if cart is empty
-  if (items.length === 0) {
-    navigate(`/${slug}`)
-    return null
-  }
+  useEffect(() => {
+    if (items.length === 0) navigate(`/${slug}`)
+  }, [items.length, navigate, slug])
+
+  if (items.length === 0) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!menu) return
+
+    if (formaPago === 'Efectivo' && !montoPago) {
+      setError('Ingresá con cuánto vas a pagar')
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -65,7 +72,17 @@ export default function CheckoutPage() {
 
     try {
       const pedido = await crearPedido(slug!, dto)
-      navigate(`/${slug}/confirmacion`, { state: { pedido, local: menu.local } })
+      navigate(`/${slug}/confirmacion`, {
+        state: {
+          pedido,
+          local: menu.local,
+          items,
+          nombreCliente: nombre.trim(),
+          formaPago,
+          formaEntrega,
+          direccionCliente: formaEntrega === 'Delivery' ? direccion.trim() : undefined,
+        },
+      })
     } catch {
       setError('No se pudo enviar el pedido. Revisá tu conexión e intentá de nuevo.')
       setLoading(false)
@@ -211,7 +228,7 @@ export default function CheckoutPage() {
         {formaPago === 'Efectivo' && (
           <div>
             <label htmlFor="monto" className={labelCls}>
-              ¿Con cuánto pagás? (opcional)
+              ¿Con cuánto pagás?
             </label>
             <input
               id="monto"

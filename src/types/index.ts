@@ -67,6 +67,19 @@ export interface Pedido {
   detalles: DetallePedido[]
 }
 
+// ── Respuesta creación de pedido ─────────────────────────────────────────────
+
+export interface PedidoCreateResponse {
+  pedidoId: number
+  codigoSeguimiento: string
+  estado: EstadoPedido
+  subtotal: number
+  costoEnvio: number
+  total: number
+  mensaje: string
+  resumenWhatsApp: string
+}
+
 // ── DTOs ─────────────────────────────────────────────────────────────────────
 
 export interface CrearDetalleDto {

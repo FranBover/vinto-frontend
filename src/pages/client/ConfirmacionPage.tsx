@@ -1,45 +1,36 @@
 import { useEffect } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useCartStore } from '../../store/cartStore'
-import type { Administrador, Pedido } from '../../types'
+import type { CartItem } from '../../store/cartStore'
+import type { LocalPublico, PedidoCreateResponse, FormaPago, FormaEntrega } from '../../types'
 
 interface LocationState {
-  pedido: Pedido
-  local: Administrador
+  pedido: PedidoCreateResponse
+  local: LocalPublico
+  items: CartItem[]
+  nombreCliente: string
+  formaPago: FormaPago
+  formaEntrega: FormaEntrega
+  direccionCliente?: string
 }
 
-const LABEL_PAGO: Record<string, string> = {
+const LABEL_PAGO: Record<FormaPago, string> = {
   Efectivo: 'Efectivo',
   Transferencia: 'Transferencia',
   Tarjeta: 'Mercado Pago',
 }
 
-const LABEL_ENTREGA: Record<string, string> = {
+const LABEL_ENTREGA: Record<FormaEntrega, string> = {
   Local: 'Retiro en local',
   Delivery: 'Delivery',
 }
 
-function getWhatsAppNumber(linkWhatsapp: string): string {
+function getWhatsAppNumber(linkWhatsapp: string | null): string | null {
+  if (!linkWhatsapp) return null
   const match = linkWhatsapp.match(/wa\.me\/(\d+)/)
   if (match) return match[1]
-  return linkWhatsapp.replace(/\D/g, '')
-}
-
-function buildWhatsAppText(pedido: Pedido): string {
-  const lines: (string | null)[] = [
-    `*Pedido #${pedido.id} — ${pedido.nombreCliente}*`,
-    `Total: $${pedido.total.toLocaleString('es-AR')}`,
-    `Pago: ${LABEL_PAGO[pedido.formaPago] ?? pedido.formaPago}`,
-    pedido.montoPagoEfectivo
-      ? `Paga con: $${pedido.montoPagoEfectivo.toLocaleString('es-AR')}`
-      : null,
-    `Entrega: ${LABEL_ENTREGA[pedido.formaEntrega] ?? pedido.formaEntrega}`,
-    pedido.direccionCliente ? `Dirección: ${pedido.direccionCliente}` : null,
-    pedido.referenciaDireccion
-      ? `Referencia: ${pedido.referenciaDireccion}`
-      : null,
-  ]
-  return encodeURIComponent(lines.filter(Boolean).join('\n'))
+  const digits = linkWhatsapp.replace(/\D/g, '')
+  return digits || null
 }
 
 export default function ConfirmacionPage() {
@@ -51,6 +42,10 @@ export default function ConfirmacionPage() {
   const state = location.state as LocationState | null
   const pedido = state?.pedido
   const local = state?.local
+  const nombreCliente = state?.nombreCliente
+  const formaPago = state?.formaPago
+  const formaEntrega = state?.formaEntrega
+  const direccionCliente = state?.direccionCliente
 
   useEffect(() => {
     limpiarCarrito()
@@ -75,8 +70,9 @@ export default function ConfirmacionPage() {
   }
 
   const waNumber = getWhatsAppNumber(local.linkWhatsapp)
-  const waText = buildWhatsAppText(pedido)
-  const waLink = `https://wa.me/${waNumber}?text=${waText}`
+  const waLink = waNumber
+    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(pedido.resumenWhatsApp)}`
+    : null
 
   return (
     <div className="min-h-screen bg-white text-[#1a1a1a] font-sans pb-10">
@@ -98,44 +94,43 @@ export default function ConfirmacionPage() {
           <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
             Número de pedido
           </p>
-          <p className="font-bold text-2xl tabular-nums">#{pedido.id}</p>
+          <p className="font-bold text-2xl tabular-nums">{pedido.codigoSeguimiento}</p>
         </div>
 
-        <div>
-          <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
-            Nombre
-          </p>
-          <p className="font-bold text-base">{pedido.nombreCliente}</p>
-        </div>
+        {nombreCliente && (
+          <div>
+            <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
+              Nombre
+            </p>
+            <p className="font-bold text-base">{nombreCliente}</p>
+          </div>
+        )}
 
         <div className="flex gap-8">
-          <div>
-            <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
-              Entrega
-            </p>
-            <p className="font-bold text-sm">
-              {LABEL_ENTREGA[pedido.formaEntrega] ?? pedido.formaEntrega}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
-              Pago
-            </p>
-            <p className="font-bold text-sm">
-              {LABEL_PAGO[pedido.formaPago] ?? pedido.formaPago}
-            </p>
-          </div>
+          {formaEntrega && (
+            <div>
+              <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
+                Entrega
+              </p>
+              <p className="font-bold text-sm">{LABEL_ENTREGA[formaEntrega]}</p>
+            </div>
+          )}
+          {formaPago && (
+            <div>
+              <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
+                Pago
+              </p>
+              <p className="font-bold text-sm">{LABEL_PAGO[formaPago]}</p>
+            </div>
+          )}
         </div>
 
-        {pedido.direccionCliente && (
+        {direccionCliente && (
           <div>
             <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
               Dirección
             </p>
-            <p className="text-sm">{pedido.direccionCliente}</p>
-            {pedido.referenciaDireccion && (
-              <p className="text-xs text-[#999] mt-0.5">{pedido.referenciaDireccion}</p>
-            )}
+            <p className="text-sm">{direccionCliente}</p>
           </div>
         )}
 
@@ -150,15 +145,21 @@ export default function ConfirmacionPage() {
         <p className="text-sm text-[#666] leading-relaxed">
           Enviá el comprobante de pago por WhatsApp para confirmar tu pedido.
         </p>
-        <a
-          href={waLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2.5 w-full bg-[#1a1a1a] text-white py-4 font-bold text-sm rounded-none"
-        >
-          <span className="w-2 h-2 rounded-full bg-[#2d5a27] shrink-0" />
-          Confirmar por WhatsApp
-        </a>
+        {waLink ? (
+          <a
+            href={waLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2.5 w-full bg-[#1a1a1a] text-white py-4 font-bold text-sm rounded-none"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#2d5a27] shrink-0" />
+            Confirmar por WhatsApp
+          </a>
+        ) : (
+          <div className="w-full bg-[#e8e8e8] text-[#999] py-4 font-bold text-sm text-center">
+            Configurá el link de WhatsApp en Mi local
+          </div>
+        )}
         <button
           onClick={() => navigate(`/${slug}`)}
           className="w-full border border-[#e8e8e8] text-[#1a1a1a] py-3.5 text-sm font-bold rounded-none"
