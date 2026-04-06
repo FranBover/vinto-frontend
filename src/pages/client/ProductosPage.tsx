@@ -16,6 +16,7 @@ export default function ProductosPage() {
   const catId = categoriaId ? parseInt(categoriaId, 10) : null
   const categoria = menu?.categorias.find(c => c.id === catId)
   const productos = categoria?.productos.filter(p => p.disponible) ?? []
+  const isOpen = menu?.local.esActivo ?? true
 
   if (loading && !menu) {
     return (
@@ -48,6 +49,13 @@ export default function ProductosPage() {
         <h1 className="font-bold text-[15px] flex-1 truncate">{categoria.nombre}</h1>
       </header>
 
+      {/* ── Closed banner ─────────────────────────────────────── */}
+      {!isOpen && (
+        <div className="bg-[#1a1a1a] text-white text-center py-2.5 text-[11px] font-bold tracking-widest uppercase">
+          El local está cerrado
+        </div>
+      )}
+
       {/* ── Product list ───────────────────────────────────────── */}
       <ul>
         {productos.length === 0 ? (
@@ -73,8 +81,9 @@ export default function ProductosPage() {
                   onClick={() =>
                     navigate(`/${slug}/productos/${categoriaId}/${producto.id}`)
                   }
+                  disabled={!isOpen}
                   aria-label={`Agregar ${producto.nombre}`}
-                  className="shrink-0 w-9 h-9 bg-[#1a1a1a] text-white flex items-center justify-center font-bold text-xl rounded-none self-end"
+                  className="shrink-0 w-9 h-9 bg-[#1a1a1a] text-white flex items-center justify-center font-bold text-xl rounded-none self-end disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   +
                 </button>

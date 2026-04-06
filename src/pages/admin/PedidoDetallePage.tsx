@@ -34,6 +34,7 @@ export default function PedidoDetallePage() {
   const [estado, setEstado] = useState<EstadoPedido>('Pendiente')
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,12 +53,13 @@ export default function PedidoDetallePage() {
     if (!pedido) return
     setSaving(true)
     try {
-      const updated = await updateEstadoPedido(pedido.id, { estado })
-      setPedido(updated)
+      await updateEstadoPedido(pedido.id, { estado })
+      setPedido({ ...pedido, estado })
       setSavedMsg(true)
-      setTimeout(() => setSavedMsg(false), 2000)
+      setTimeout(() => setSavedMsg(false), 2500)
     } catch {
-      // stay silent, user can retry
+      setSaveError('No se pudo actualizar el estado.')
+      setTimeout(() => setSaveError(null), 3000)
     } finally {
       setSaving(false)
     }
@@ -93,28 +95,36 @@ export default function PedidoDetallePage() {
       <div className="max-w-2xl space-y-5">
 
         {/* Estado selector */}
-        <div className="border border-[#e8e8e8] bg-white px-5 py-4 flex items-center gap-4">
-          <div className="flex-1">
-            <label htmlFor="estado" className={labelCls}>Estado del pedido</label>
-            <select
-              id="estado"
-              value={estado}
-              onChange={e => setEstado(e.target.value as EstadoPedido)}
-              className="w-full border border-[#d0d0d0] px-3 py-2.5 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white"
+        <div className="border border-[#e8e8e8] bg-white px-5 py-4 space-y-3">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <label htmlFor="estado" className={labelCls}>Estado del pedido</label>
+              <select
+                id="estado"
+                value={estado}
+                onChange={e => setEstado(e.target.value as EstadoPedido)}
+                className="w-full border border-[#d0d0d0] px-3 py-2.5 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white"
+              >
+                {ESTADOS.map(s => (
+                  <option key={s} value={s}>{ESTADO_LABELS[s]}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleSaveEstado}
+              disabled={saving || estado === pedido.estado}
+              className="mt-5 px-5 py-2.5 text-sm font-bold text-white rounded-none disabled:opacity-40 transition-colors"
+              style={{ backgroundColor: '#2d5a27' }}
             >
-              {ESTADOS.map(s => (
-                <option key={s} value={s}>{ESTADO_LABELS[s]}</option>
-              ))}
-            </select>
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
           </div>
-          <button
-            onClick={handleSaveEstado}
-            disabled={saving || estado === pedido.estado}
-            className="mt-5 px-5 py-2.5 text-sm font-bold text-white rounded-none disabled:opacity-40 transition-colors"
-            style={{ backgroundColor: '#2d5a27' }}
-          >
-            {saving ? 'Guardando…' : savedMsg ? '¡Guardado!' : 'Guardar'}
-          </button>
+          {savedMsg && (
+            <p className="text-sm font-medium" style={{ color: '#2d5a27' }}>Estado actualizado</p>
+          )}
+          {saveError && (
+            <p className="text-sm text-red-600">{saveError}</p>
+          )}
         </div>
 
         {/* Cliente */}
@@ -162,7 +172,7 @@ export default function PedidoDetallePage() {
                       className="text-sm underline"
                       style={{ color: '#2d5a27' }}
                     >
-                      Ver en Maps →
+                      Ver ubicación →
                     </a>
                   </div>
                 )}
@@ -193,7 +203,9 @@ export default function PedidoDetallePage() {
             {(pedido.detalles ?? []).map(d => (
               <div key={d.id} className="flex justify-between items-start text-sm">
                 <div>
-                  <span className="font-medium">{d.cantidad}× Producto #{d.productoId}</span>
+                  <span className="font-medium">
+                    {d.cantidad}× {d.nombreProducto ?? `Producto #${d.productoId}`}
+                  </span>
                   {(d.productosExtra ?? []).length > 0 && (
                     <p className="text-xs text-[#aaa] mt-0.5">
                       + {(d.productosExtra ?? []).map(e => e.nombre).join(', ')}

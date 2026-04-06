@@ -26,6 +26,8 @@ export default function MiLocalPage() {
   const [logoUrl, setLogoUrl] = useState('')
   const [aliasTransferencia, setAliasTransferencia] = useState('')
   const [titularCuenta, setTitularCuenta] = useState('')
+  const [horarios, setHorarios] = useState('')
+  const [ubicacionUrl, setUbicacionUrl] = useState('')
 
   useEffect(() => {
     if (!adminId) return
@@ -40,6 +42,8 @@ export default function MiLocalPage() {
         setLogoUrl(a.logoUrl ?? '')
         setAliasTransferencia(a.aliasTransferencia ?? '')
         setTitularCuenta(a.titularCuenta ?? '')
+        setHorarios(a.horarios ?? '')
+        setUbicacionUrl(a.ubicacionUrl ?? '')
       })
       .catch(() => setError('No se pudieron cargar los datos del local.'))
       .finally(() => setLoading(false))
@@ -61,6 +65,8 @@ export default function MiLocalPage() {
         logoUrl: logoUrl.trim(),
         aliasTransferencia: aliasTransferencia.trim(),
         titularCuenta: titularCuenta.trim(),
+        horarios: horarios.trim(),
+        ubicacionUrl: ubicacionUrl.trim(),
       })
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 3000)
@@ -189,6 +195,26 @@ export default function MiLocalPage() {
                 value={titularCuenta}
                 onChange={e => setTitularCuenta(e.target.value)}
                 placeholder="Juan Pérez"
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Horarios</label>
+              <textarea
+                className={`${inputCls} resize-none`}
+                rows={2}
+                value={horarios}
+                onChange={e => setHorarios(e.target.value)}
+                placeholder="Ej: Mar a Dom de 19:30 a 01:00"
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Link de ubicación (Google Maps)</label>
+              <input
+                className={inputCls}
+                type="url"
+                value={ubicacionUrl}
+                onChange={e => setUbicacionUrl(e.target.value)}
+                placeholder="https://maps.app.goo.gl/..."
               />
             </div>
             <div>

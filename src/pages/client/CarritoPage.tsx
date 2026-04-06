@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../../store/cartStore'
+import { useMenuStore } from '../../store/menuStore'
 
 export default function CarritoPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -8,6 +9,7 @@ export default function CarritoPage() {
   const quitarItem = useCartStore(s => s.quitarItem)
   const cambiarCantidad = useCartStore(s => s.cambiarCantidad)
   const total = useCartStore(s => s.total())
+  const isOpen = useMenuStore(s => (slug ? s.data[slug]?.local.esActivo : undefined)) ?? true
 
   const Header = () => (
     <header className="sticky top-0 z-30 bg-white border-b border-[#1a1a1a] h-14 flex items-center gap-4 px-4">
@@ -110,9 +112,15 @@ export default function CarritoPage() {
 
       {/* ── Bottom buttons ─────────────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#e8e8e8]">
+        {!isOpen && (
+          <p className="text-center text-[11px] font-bold text-[#999] uppercase tracking-widest py-2">
+            El local está cerrado temporalmente
+          </p>
+        )}
         <button
           onClick={() => navigate(`/${slug}/checkout`)}
-          className="w-full bg-[#1a1a1a] text-white py-4 font-bold text-sm rounded-none flex items-center justify-between px-4"
+          disabled={!isOpen}
+          className="w-full bg-[#1a1a1a] text-white py-4 font-bold text-sm rounded-none flex items-center justify-between px-4 disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <span>Confirmar pedido</span>
           <span>→</span>

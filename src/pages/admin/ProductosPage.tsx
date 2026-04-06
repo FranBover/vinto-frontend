@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from '../../components/admin/AdminLayout'
 import {
-  getProductos, createProducto, updateProducto,
+  getProductos, createProducto, updateProducto, toggleDisponibilidad,
   getCategorias, getExtras, createExtra, deleteExtra,
 } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
@@ -36,6 +36,9 @@ export default function ProductosAdminPage() {
   const [editingProducto, setEditingProducto] = useState<Producto | null>(null)
   const [form, setForm] = useState<ProductoForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+
+  // Toggle disponibilidad
+  const [togglingId, setTogglingId] = useState<number | null>(null)
 
   // Extras state (only meaningful when editing an existing product)
   const [extras, setExtras] = useState<ProductoExtra[]>([])
@@ -137,6 +140,18 @@ export default function ProductosAdminPage() {
     setProductos(prev => prev.map(p => p.id === editingProducto.id ? { ...p, extras: freshExtras } : p))
   }
 
+  const handleToggleDisponibilidad = async (p: Producto) => {
+    if (!adminId) return
+    setTogglingId(p.id)
+    try {
+      await toggleDisponibilidad(p.id, !p.disponible)
+      const fresh = await getProductos(adminId)
+      setProductos(fresh)
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
   const categoriaNombre = (id: number) =>
     categorias.find(c => c.id === id)?.nombre ?? '—'
 
@@ -173,7 +188,10 @@ export default function ProductosAdminPage() {
                 </tr>
               ) : (
                 productos.map(p => (
-                  <tr key={p.id} className="border-b border-[#e8e8e8] last:border-b-0 hover:bg-[#fafaf9] transition-colors">
+                  <tr
+                    key={p.id}
+                    className={`border-b border-[#e8e8e8] last:border-b-0 hover:bg-[#fafaf9] transition-colors${p.disponible ? '' : ' opacity-50'}`}
+                  >
                     <td className="px-4 py-3">
                       <span className="font-medium text-[#1a1a1a]">{p.nombre}</span>
                       {(p.extras ?? []).length > 0 && (
@@ -189,12 +207,32 @@ export default function ProductosAdminPage() {
                       />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEdit(p)}
-                        className="text-xs font-bold text-[#1a1a1a] border border-[#1a1a1a] px-3 py-1.5 rounded-none hover:bg-[#1a1a1a] hover:text-white transition-colors"
-                      >
-                        Editar
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEdit(p)}
+                          className="text-xs font-bold text-[#1a1a1a] border border-[#1a1a1a] px-3 py-1.5 rounded-none hover:bg-[#1a1a1a] hover:text-white transition-colors"
+                        >
+                          Editar
+                        </button>
+                        {p.disponible ? (
+                          <button
+                            onClick={() => handleToggleDisponibilidad(p)}
+                            disabled={togglingId === p.id}
+                            className="text-xs font-bold text-[#666] border border-[#d0d0d0] px-3 py-1.5 rounded-none hover:bg-[#f5f5f5] transition-colors disabled:opacity-40"
+                          >
+                            {togglingId === p.id ? '…' : 'Deshabilitar'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleToggleDisponibilidad(p)}
+                            disabled={togglingId === p.id}
+                            className="text-xs font-bold text-white px-3 py-1.5 rounded-none transition-colors disabled:opacity-40"
+                            style={{ backgroundColor: '#2d5a27' }}
+                          >
+                            {togglingId === p.id ? '…' : 'Habilitar'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

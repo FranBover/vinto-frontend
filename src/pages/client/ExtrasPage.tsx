@@ -24,6 +24,7 @@ export default function ExtrasPage() {
   const menu = slug ? data[slug] : null
   const prodId = productoId ? parseInt(productoId, 10) : null
   const producto = menu?.categorias.flatMap(c => c.productos).find(p => p.id === prodId)
+  const isOpen = menu?.local.esActivo ?? true
 
   if (!menu || !producto) {
     return (
@@ -154,12 +155,18 @@ export default function ExtrasPage() {
       </div>
 
       {/* ── Agregar bar ────────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-[#2d5a27] text-white">
+      <div
+        className="fixed bottom-0 left-0 right-0 z-20 text-white"
+        style={{ backgroundColor: isOpen ? '#2d5a27' : '#999' }}
+      >
         <button
-          onClick={handleAgregar}
-          className="w-full flex items-center justify-between px-4 py-4"
+          onClick={isOpen ? handleAgregar : undefined}
+          disabled={!isOpen}
+          className="w-full flex items-center justify-between px-4 py-4 disabled:cursor-not-allowed"
         >
-          <span className="font-bold text-sm">Agregar al pedido</span>
+          <span className="font-bold text-sm">
+            {isOpen ? 'Agregar al pedido' : 'Local cerrado'}
+          </span>
           <span className="font-bold">${totalItem.toLocaleString('es-AR')}</span>
         </button>
       </div>

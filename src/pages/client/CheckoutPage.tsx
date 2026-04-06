@@ -64,6 +64,7 @@ export default function CheckoutPage() {
       ...(formaEntrega === 'Delivery' && {
         direccionCliente: direccion.trim(),
         ...(referencia.trim() && { referenciaDireccion: referencia.trim() }),
+        ubicacionUrl: `https://www.google.com/maps/search/?q=${encodeURIComponent(direccion.trim())}`,
       }),
       ...(formaPago === 'Efectivo' && montoPago && {
         montoPagoEfectivo: parseFloat(montoPago),

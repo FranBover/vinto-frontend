@@ -128,15 +128,17 @@ export default function MenuPage() {
           >
             Información
           </button>
-          <a
-            href={`https://maps.google.com/?q=${encodeURIComponent(local.direccion)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setDrawerOpen(false)}
-            className="px-5 py-4 text-sm font-bold border-b border-white/10 hover:bg-white/5 transition-colors"
-          >
-            Ubicación ↗
-          </a>
+          {(local.ubicacionUrl || local.direccion) && (
+            <a
+              href={local.ubicacionUrl ?? `https://www.google.com/maps/search/?q=${encodeURIComponent(local.direccion)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setDrawerOpen(false)}
+              className="px-5 py-4 text-sm font-bold border-b border-white/10 hover:bg-white/5 transition-colors"
+            >
+              Ubicación ↗
+            </a>
+          )}
         </nav>
       </aside>
 
@@ -202,14 +204,18 @@ export default function MenuPage() {
                 <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1.5">
                   Teléfono / WhatsApp
                 </p>
-                <a
-                  href={local.linkWhatsapp ?? undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-[#2d5a27] underline text-sm"
-                >
-                  {local.telefono}
-                </a>
+                {local.linkWhatsapp ? (
+                  <a
+                    href={local.linkWhatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-[#2d5a27] underline text-sm"
+                  >
+                    {local.telefono}
+                  </a>
+                ) : (
+                  <p className="text-sm font-bold">{local.telefono}</p>
+                )}
               </div>
               <div>
                 <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1.5">
@@ -217,13 +223,26 @@ export default function MenuPage() {
                 </p>
                 <p className="text-sm">{local.direccion}</p>
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1.5">
-                  Horarios
-                </p>
-                <p className="text-sm">Lun – Vie: 11:00 – 22:00</p>
-                <p className="text-sm">Sáb – Dom: 12:00 – 23:00</p>
-              </div>
+              {local.ubicacionUrl && (
+                <div>
+                  <a
+                    href={local.ubicacionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-bold text-[#2d5a27] underline"
+                  >
+                    Ver en Maps →
+                  </a>
+                </div>
+              )}
+              {local.horarios && (
+                <div>
+                  <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1.5">
+                    Horarios
+                  </p>
+                  <p className="text-sm whitespace-pre-line">{local.horarios}</p>
+                </div>
+              )}
             </div>
             <div className="px-5 pb-6 pt-2">
               <button

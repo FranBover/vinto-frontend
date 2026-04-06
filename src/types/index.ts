@@ -13,6 +13,8 @@ export interface Administrador {
   esAbierto: boolean
   aliasTransferencia: string | null
   titularCuenta: string | null
+  horarios: string | null
+  ubicacionUrl: string | null
 }
 
 export interface Categoria {
@@ -47,6 +49,7 @@ export interface DetallePedido {
   id: number
   pedidoId: number
   productoId: number
+  nombreProducto?: string
   cantidad: number
   precioUnitario: number
   productosExtra: ProductoExtra[]
@@ -120,6 +123,8 @@ export interface LocalPublico {
   esActivo: boolean
   aliasTransferencia: string | null
   titularCuenta: string | null
+  horarios: string | null
+  ubicacionUrl: string | null
 }
 
 export interface CategoriaPublica {

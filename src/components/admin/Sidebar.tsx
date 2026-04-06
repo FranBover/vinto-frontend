@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 
 const NAV_ITEMS = [
@@ -56,6 +56,12 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const logout = useAuthStore(s => s.logout)
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/admin/login')
+  }
 
   return (
     <aside
@@ -102,7 +108,7 @@ export default function Sidebar() {
       {/* Footer */}
       <div className="px-5 py-4 border-t border-white/10">
         <button
-          onClick={logout}
+          onClick={handleLogout}
           className="w-full text-left text-xs text-[#777] hover:text-white transition-colors py-1"
         >
           Cerrar sesión

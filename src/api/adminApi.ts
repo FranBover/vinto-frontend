@@ -26,9 +26,8 @@ export const getPedidoById = async (id: number): Promise<Pedido> => {
   return data
 }
 
-export const updateEstadoPedido = async (id: number, dto: UpdateEstadoDto): Promise<Pedido> => {
-  const { data } = await apiClient.patch<Pedido>(`/pedidos/${id}/estado`, dto)
-  return data
+export const updateEstadoPedido = async (id: number, dto: UpdateEstadoDto): Promise<void> => {
+  await apiClient.patch(`/pedidos/${id}/estado`, dto)
 }
 
 // ── Productos ─────────────────────────────────────────────────────────────────
@@ -50,6 +49,10 @@ export const updateProducto = async (id: number, producto: Partial<Omit<Producto
 
 export const deleteProducto = async (id: number): Promise<void> => {
   await apiClient.delete(`/productos/${id}`)
+}
+
+export const toggleDisponibilidad = async (id: number, disponible: boolean): Promise<void> => {
+  await apiClient.patch(`/Productos/${id}/disponibilidad`, { disponible })
 }
 
 // ── Categorías ────────────────────────────────────────────────────────────────
@@ -117,6 +120,8 @@ export const updateLocalData = async (id: number, payload: {
   esActivo: boolean
   aliasTransferencia: string
   titularCuenta: string
+  horarios: string
+  ubicacionUrl: string
 }) => {
   const { data } = await apiClient.patch(`/Administrador/${id}/local`, payload)
   return data
