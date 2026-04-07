@@ -16,6 +16,7 @@ export default function ExtrasPage() {
 
   const [selectedExtras, setSelectedExtras] = useState<ProductoExtra[]>([])
   const [cantidad, setCantidad] = useState(1)
+  const [imgError, setImgError] = useState(false)
 
   useEffect(() => {
     if (slug) fetchMenu(slug)
@@ -70,12 +71,13 @@ export default function ExtrasPage() {
       <div className="flex-1 overflow-auto pb-24">
 
         {/* Hero */}
-        <div className="w-full h-52 bg-[#f5f5f5] flex items-center justify-center overflow-hidden">
-          {producto.imagenUrl ? (
+        <div className="w-full h-40 bg-[#f5f5f5] flex items-center justify-center overflow-hidden">
+          {producto.imagenUrl && !imgError ? (
             <img
               src={producto.imagenUrl}
               alt={producto.nombre}
               className="w-full h-full object-cover"
+              onError={() => setImgError(true)}
             />
           ) : (
             <span className="text-6xl select-none" role="img" aria-label="Plato">

@@ -9,6 +9,7 @@ export default function MenuPage() {
   const { data, loading, error, fetchMenu, clearCache } = useMenuStore()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [logoError, setLogoError] = useState(false)
 
   useEffect(() => {
     if (slug) fetchMenu(slug)
@@ -59,11 +60,12 @@ export default function MenuPage() {
         </button>
 
         <div className="w-10 h-10 overflow-hidden shrink-0">
-          {local.logoUrl ? (
+          {local.logoUrl && !logoError ? (
             <img
               src={local.logoUrl}
               alt={local.nombreLocal}
               className="w-full h-full object-cover"
+              onError={() => setLogoError(true)}
             />
           ) : (
             <div className="w-full h-full bg-[#1a1a1a] text-white flex items-center justify-center font-bold text-base select-none">
@@ -92,11 +94,12 @@ export default function MenuPage() {
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 shrink-0 overflow-hidden">
-              {local.logoUrl ? (
+              {local.logoUrl && !logoError ? (
                 <img
                   src={local.logoUrl}
                   alt={local.nombreLocal}
                   className="w-full h-full object-cover"
+                  onError={() => setLogoError(true)}
                 />
               ) : (
                 <div className="w-full h-full bg-white text-[#1a1a1a] flex items-center justify-center font-bold text-sm select-none">

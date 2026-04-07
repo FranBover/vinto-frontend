@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
 import CartBar from '../../components/client/CartBar'
@@ -17,6 +17,7 @@ export default function ProductosPage() {
   const categoria = menu?.categorias.find(c => c.id === catId)
   const productos = categoria?.productos.filter(p => p.disponible) ?? []
   const isOpen = menu?.local.esActivo ?? true
+  const [imgErrors, setImgErrors] = useState<Set<number>>(new Set())
 
   if (loading && !menu) {
     return (
@@ -77,16 +78,32 @@ export default function ProductosPage() {
                     ${producto.precio.toLocaleString('es-AR')}
                   </p>
                 </div>
-                <button
-                  onClick={() =>
-                    navigate(`/${slug}/productos/${categoriaId}/${producto.id}`)
-                  }
-                  disabled={!isOpen}
-                  aria-label={`Agregar ${producto.nombre}`}
-                  className="shrink-0 w-9 h-9 bg-[#1a1a1a] text-white flex items-center justify-center font-bold text-xl rounded-none self-end disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  +
-                </button>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div className="w-[60px] h-[60px] overflow-hidden bg-[#f5f5f5]">
+                    {producto.imagenUrl && !imgErrors.has(producto.id) ? (
+                      <img
+                        src={producto.imagenUrl}
+                        alt={producto.nombre}
+                        className="w-full h-full object-cover"
+                        onError={() => setImgErrors(prev => new Set(prev).add(producto.id))}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl select-none">
+                        🍽️
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() =>
+                      navigate(`/${slug}/productos/${categoriaId}/${producto.id}`)
+                    }
+                    disabled={!isOpen}
+                    aria-label={`Agregar ${producto.nombre}`}
+                    className="w-9 h-9 bg-[#1a1a1a] text-white flex items-center justify-center font-bold text-xl rounded-none disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             </li>
           ))
