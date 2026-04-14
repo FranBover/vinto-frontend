@@ -14,6 +14,7 @@ interface LocationState {
   formaEntrega: FormaEntrega
   direccionCliente?: string
   referencia?: string
+  ubicacionUrl?: string
   montoPagoEfectivo?: number
 }
 
@@ -42,35 +43,20 @@ function formatFecha(): string {
 
 function buildWhatsAppText(state: LocationState): string {
   const { pedido, local, items, nombreCliente, telefono, formaPago,
-          formaEntrega, direccionCliente, referencia, montoPagoEfectivo } = state
+          formaEntrega, direccionCliente, referencia, ubicacionUrl, montoPagoEfectivo } = state
 
   const lines: string[] = []
 
-  lines.push('*¡Hola! Te paso el resumen de mi pedido* 🛍️')
+  lines.push('*¡Nuevo pedido!* 🛍️')
   lines.push('')
-  lines.push(`*Pedido:* #${pedido.codigoSeguimiento}`)
-  lines.push(`*Local:* ${local.nombreLocal}`)
-  lines.push(`*Fecha:* ${formatFecha()}`)
+  lines.push(`*#${pedido.codigoSeguimiento}* · ${local.nombreLocal}`)
+  lines.push(formatFecha())
   lines.push('')
-  lines.push(`*Cliente:* ${nombreCliente}`)
-  lines.push(`*Teléfono:* ${telefono}`)
+  lines.push('*Cliente*')
+  lines.push(nombreCliente)
+  lines.push(telefono)
   lines.push('')
-  lines.push(`*Forma de pago:* ${LABEL_PAGO[formaPago]}`)
-  if (formaPago === 'Efectivo' && montoPagoEfectivo) {
-    lines.push(`*Paga con:* ${pesos(montoPagoEfectivo)}`)
-  }
-  if (formaPago === 'Transferencia') {
-    if (local.aliasTransferencia) lines.push(`*Alias:* ${local.aliasTransferencia}`)
-    if (local.titularCuenta) lines.push(`*Titular:* ${local.titularCuenta}`)
-  }
-  lines.push('')
-  lines.push(`*Entrega:* ${LABEL_ENTREGA[formaEntrega]}`)
-  if (formaEntrega === 'Delivery') {
-    if (direccionCliente) lines.push(`*Dirección:* ${direccionCliente}`)
-    if (referencia) lines.push(`*Referencia:* ${referencia}`)
-  }
-  lines.push('')
-  lines.push('*Productos:*')
+  lines.push('*Productos*')
   for (const item of items) {
     const precioUnitario = item.producto.precio + item.extras.reduce((s, e) => s + e.precioAdicional, 0)
     lines.push(`${item.cantidad}x ${item.producto.nombre}: ${pesos(precioUnitario * item.cantidad)}`)
@@ -82,9 +68,28 @@ function buildWhatsAppText(state: LocationState): string {
   if (pedido.subtotal !== pedido.total) {
     lines.push(`*Subtotal:* ${pesos(pedido.subtotal)}`)
   }
+  if (formaEntrega === 'Delivery' && local.costoEnvio != null) {
+    lines.push(`*Costo de envío:* ${pesos(local.costoEnvio)}`)
+  }
   lines.push(`*Total:* ${pesos(pedido.total)}`)
   lines.push('')
-  lines.push('_¡Espero tu confirmación!_ ✅')
+  lines.push(`*Pago:* ${LABEL_PAGO[formaPago]}`)
+  if (formaPago === 'Efectivo' && montoPagoEfectivo) {
+    lines.push(`*Paga con:* ${pesos(montoPagoEfectivo)}`)
+  }
+  if (formaPago === 'Transferencia') {
+    if (local.aliasTransferencia) lines.push(`Alias: ${local.aliasTransferencia}`)
+    if (local.titularCuenta) lines.push(`Titular: ${local.titularCuenta}`)
+  }
+  lines.push('')
+  lines.push(`*Entrega:* ${LABEL_ENTREGA[formaEntrega]}`)
+  if (formaEntrega === 'Delivery') {
+    if (direccionCliente) lines.push(`Dirección: ${direccionCliente}`)
+    if (referencia) lines.push(`Referencia: ${referencia}`)
+    if (ubicacionUrl) lines.push(`Ubicación: ${ubicacionUrl}`)
+  }
+  lines.push('')
+  lines.push('_¡Espero tu confirmación!_')
 
   return encodeURIComponent(lines.join('\n'))
 }
@@ -191,6 +196,15 @@ export default function ConfirmacionPage() {
               Dirección
             </p>
             <p className="text-sm">{direccionCliente}</p>
+          </div>
+        )}
+
+        {formaEntrega === 'Delivery' && state.local.costoEnvio != null && (
+          <div>
+            <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
+              Costo de envío
+            </p>
+            <p className="font-bold text-sm">{pesos(state.local.costoEnvio)}</p>
           </div>
         )}
 

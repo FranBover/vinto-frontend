@@ -28,6 +28,8 @@ export default function MiLocalPage() {
   const [titularCuenta, setTitularCuenta] = useState('')
   const [horarios, setHorarios] = useState('')
   const [ubicacionUrl, setUbicacionUrl] = useState('')
+  const [zonaEnvio, setZonaEnvio] = useState<'Ciudad' | 'Nacional'>('Nacional')
+  const [costoEnvio, setCostoEnvio] = useState('')
 
   useEffect(() => {
     if (!adminId) return
@@ -44,6 +46,8 @@ export default function MiLocalPage() {
         setTitularCuenta(a.titularCuenta ?? '')
         setHorarios(a.horarios ?? '')
         setUbicacionUrl(a.ubicacionUrl ?? '')
+        setZonaEnvio(a.zonaEnvio ?? 'Nacional')
+        setCostoEnvio(a.costoEnvio != null ? String(a.costoEnvio) : '')
       })
       .catch(() => setError('No se pudieron cargar los datos del local.'))
       .finally(() => setLoading(false))
@@ -67,6 +71,8 @@ export default function MiLocalPage() {
         titularCuenta: titularCuenta.trim(),
         horarios: horarios.trim(),
         ubicacionUrl: ubicacionUrl.trim(),
+        zonaEnvio,
+        costoEnvio: costoEnvio !== '' ? parseFloat(costoEnvio) : null,
       })
       setSavedMsg(true)
       setTimeout(() => setSavedMsg(false), 3000)
@@ -169,6 +175,49 @@ export default function MiLocalPage() {
                 onChange={e => setDireccion(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* Configuración de envíos */}
+          <div className="border border-[#e8e8e8] bg-white px-6 py-5 space-y-4">
+            <p className="font-bold text-[13px]">Configuración de envíos</p>
+            <div>
+              <p className={labelCls}>Zona de cobertura</p>
+              <div className="flex border border-[#1a1a1a]">
+                {(['Ciudad', 'Nacional'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setZonaEnvio(opt)}
+                    className={`flex-1 py-2.5 text-sm font-bold rounded-none transition-colors ${
+                      zonaEnvio === opt
+                        ? 'bg-[#1a1a1a] text-white'
+                        : 'bg-white text-[#1a1a1a] hover:bg-[#f5f5f5]'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+              {zonaEnvio === 'Ciudad' && (
+                <p className="mt-2 text-xs text-[#aaa]">
+                  El autocomplete de dirección filtrará por la ciudad ingresada en Dirección
+                </p>
+              )}
+            </div>
+            <div>
+              <label className={labelCls}>Costo de envío (opcional)</label>
+              <input
+                className={inputCls}
+                type="number"
+                min={0}
+                value={costoEnvio}
+                onChange={e => setCostoEnvio(e.target.value)}
+                placeholder="Ej: 2500"
+              />
+            </div>
+          </div>
+
+          <div className="border border-[#e8e8e8] bg-white px-6 py-5 space-y-4">
             <div>
               <label className={labelCls}>Link de WhatsApp</label>
               <input

@@ -122,6 +122,8 @@ export const updateLocalData = async (id: number, payload: {
   titularCuenta: string
   horarios: string
   ubicacionUrl: string
+  zonaEnvio?: string
+  costoEnvio?: number | null
 }) => {
   const { data } = await apiClient.patch(`/Administrador/${id}/local`, payload)
   return data

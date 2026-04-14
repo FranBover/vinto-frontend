@@ -15,6 +15,8 @@ export interface Administrador {
   titularCuenta: string | null
   horarios: string | null
   ubicacionUrl: string | null
+  zonaEnvio: 'Ciudad' | 'Nacional'
+  costoEnvio: number | null
 }
 
 export interface Categoria {
@@ -125,6 +127,8 @@ export interface LocalPublico {
   titularCuenta: string | null
   horarios: string | null
   ubicacionUrl: string | null
+  zonaEnvio: 'Ciudad' | 'Nacional'
+  costoEnvio: number | null
 }
 
 export interface CategoriaPublica {

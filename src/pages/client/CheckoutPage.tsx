@@ -4,6 +4,7 @@ import { useCartStore } from '../../store/cartStore'
 import { useMenuStore } from '../../store/menuStore'
 import { crearPedido } from '../../api/publicApi'
 import type { FormaPago, FormaEntrega, CrearPedidoDto } from '../../types'
+import DireccionAutocomplete from '../../components/DireccionAutocomplete'
 
 const LABEL_FORMA_PAGO: Record<FormaPago, string> = {
   Efectivo: 'Efectivo',
@@ -23,7 +24,18 @@ export default function CheckoutPage() {
   const [formaEntrega, setFormaEntrega] = useState<FormaEntrega>('Local')
   const [formaPago, setFormaPago] = useState<FormaPago>('Efectivo')
   const [direccion, setDireccion] = useState('')
+  const [lat, setLat] = useState(0)
+  const [lon, setLon] = useState(0)
   const [referencia, setReferencia] = useState('')
+  const [tipoEdificacion, setTipoEdificacion] = useState<
+    'Casa' | 'Barrio cerrado' | 'Edificio / Condominio' | 'Centro comercial / Local comercial' | 'Otro' | ''
+  >('')
+  const [nombreBarrio, setNombreBarrio] = useState('')
+  const [manzanaLote, setManzanaLote] = useState('')
+  const [nombreEdificio, setNombreEdificio] = useState('')
+  const [pisoDpto, setPisoDpto] = useState('')
+  const [nombreComercio, setNombreComercio] = useState('')
+  const [nombreLugar, setNombreLugar] = useState('')
   const [montoPago, setMontoPago] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +59,30 @@ export default function CheckoutPage() {
     setLoading(true)
     setError(null)
 
+    // Build referenciaDireccion from edificación type + fields
+    let referenciaDireccion = ''
+    if (tipoEdificacion === 'Casa') {
+      referenciaDireccion = referencia.trim()
+    } else if (tipoEdificacion === 'Barrio cerrado') {
+      const parts = [`Barrio cerrado: ${nombreBarrio.trim()}`]
+      if (manzanaLote.trim()) parts.push(manzanaLote.trim())
+      if (referencia.trim()) parts.push(referencia.trim())
+      referenciaDireccion = parts.join(', ')
+    } else if (tipoEdificacion === 'Edificio / Condominio') {
+      const parts = [`Edificio / Condominio: ${nombreEdificio.trim()}`]
+      if (pisoDpto.trim()) parts.push(pisoDpto.trim())
+      if (referencia.trim()) parts.push(referencia.trim())
+      referenciaDireccion = parts.join(', ')
+    } else if (tipoEdificacion === 'Centro comercial / Local comercial') {
+      const parts = [`Centro comercial / Local comercial: ${nombreComercio.trim()}`]
+      if (referencia.trim()) parts.push(referencia.trim())
+      referenciaDireccion = parts.join(', ')
+    } else if (tipoEdificacion === 'Otro') {
+      const parts = [nombreLugar.trim()]
+      if (referencia.trim()) parts.push(referencia.trim())
+      referenciaDireccion = parts.filter(Boolean).join(', ')
+    }
+
     const dto: CrearPedidoDto = {
       administradorId: menu.local.id,
       nombreCliente: nombre.trim(),
@@ -63,8 +99,11 @@ export default function CheckoutPage() {
       })),
       ...(formaEntrega === 'Delivery' && {
         direccionCliente: direccion.trim(),
-        ...(referencia.trim() && { referenciaDireccion: referencia.trim() }),
-        ubicacionUrl: `https://www.google.com/maps/search/?q=${encodeURIComponent(direccion.trim())}`,
+        ...(referenciaDireccion && { referenciaDireccion }),
+        ubicacionUrl:
+          lat && lon
+            ? `https://www.google.com/maps?q=${lat},${lon}`
+            : `https://www.google.com/maps/search/?q=${encodeURIComponent(direccion.trim())}`,
       }),
       ...(formaPago === 'Efectivo' && montoPago && {
         montoPagoEfectivo: parseFloat(montoPago),
@@ -83,7 +122,10 @@ export default function CheckoutPage() {
           formaPago,
           formaEntrega,
           direccionCliente: formaEntrega === 'Delivery' ? direccion.trim() : undefined,
-          referencia: formaEntrega === 'Delivery' && referencia.trim() ? referencia.trim() : undefined,
+          referencia: formaEntrega === 'Delivery' && referenciaDireccion ? referenciaDireccion : undefined,
+          ubicacionUrl: formaEntrega === 'Delivery' && lat && lon
+            ? `https://www.google.com/maps?q=${lat},${lon}`
+            : undefined,
           montoPagoEfectivo: formaPago === 'Efectivo' && montoPago ? parseFloat(montoPago) : undefined,
         },
       })
@@ -170,30 +212,191 @@ export default function CheckoutPage() {
         {formaEntrega === 'Delivery' && (
           <div className="space-y-4">
             <div>
-              <label htmlFor="direccion" className={labelCls}>Dirección</label>
-              <input
-                id="direccion"
-                type="text"
+              <label className={labelCls}>Dirección</label>
+              <DireccionAutocomplete
                 value={direccion}
-                onChange={e => setDireccion(e.target.value)}
-                required
-                placeholder="Calle, número, piso / depto"
-                className={inputCls}
+                onChange={(d, la, lo) => { setDireccion(d); setLat(la); setLon(lo) }}
+                inputClassName={inputCls}
+                zonaEnvio={menu?.local.zonaEnvio}
+                ciudadReferencia={menu?.local.direccion}
               />
             </div>
+
+            {/* Tipo de edificación */}
             <div>
-              <label htmlFor="referencia" className={labelCls}>
-                Referencia (opcional)
-              </label>
-              <input
-                id="referencia"
-                type="text"
-                value={referencia}
-                onChange={e => setReferencia(e.target.value)}
-                placeholder="Ej: portón negro, timbre 2"
-                className={inputCls}
-              />
+              <p className={labelCls}>Tipo de edificación</p>
+              <div className="border border-[#d0d0d0]">
+                {(
+                  ['Casa', 'Barrio cerrado', 'Edificio / Condominio', 'Centro comercial / Local comercial', 'Otro'] as const
+                ).map((tipo, i) => (
+                  <div
+                    key={tipo}
+                    onClick={() => tipoEdificacion !== tipo && setTipoEdificacion(tipo)}
+                    className={`flex items-center justify-between px-3 py-3 text-sm cursor-pointer ${
+                      i < 4 ? 'border-b border-[#e8e8e8]' : ''
+                    } ${tipoEdificacion === tipo ? 'bg-[#f5f5f5]' : 'hover:bg-[#fafafa]'}`}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <span className="flex-shrink-0 w-4 h-4 border border-[#1a1a1a] flex items-center justify-center">
+                        {tipoEdificacion === tipo && (
+                          <span className="w-2 h-2 bg-[#1a1a1a] block" />
+                        )}
+                      </span>
+                      <span>{tipo}</span>
+                    </span>
+                    {tipoEdificacion === tipo && (
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setTipoEdificacion('') }}
+                        className="text-sm text-[#aaa] hover:text-[#1a1a1a] ml-2 flex-shrink-0"
+                        aria-label="Cambiar tipo de edificación"
+                      >
+                        ✏
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
+
+            {/* Conditional fields per edificación type */}
+            {tipoEdificacion === 'Casa' && (
+              <div>
+                <label className={labelCls}>Referencias</label>
+                <textarea
+                  value={referencia}
+                  onChange={e => setReferencia(e.target.value)}
+                  placeholder="Ej: portón negro, timbre 2"
+                  className={`${inputCls} resize-none`}
+                  rows={2}
+                />
+              </div>
+            )}
+
+            {tipoEdificacion === 'Barrio cerrado' && (
+              <>
+                <div>
+                  <label className={labelCls}>Nombre del barrio</label>
+                  <input
+                    type="text"
+                    value={nombreBarrio}
+                    onChange={e => setNombreBarrio(e.target.value)}
+                    placeholder="Ej: Privadas del Sol"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Manzana / lote / número de casa</label>
+                  <input
+                    type="text"
+                    value={manzanaLote}
+                    onChange={e => setManzanaLote(e.target.value)}
+                    placeholder="Ej: Manzana 5 Lote 8"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Referencias</label>
+                  <textarea
+                    value={referencia}
+                    onChange={e => setReferencia(e.target.value)}
+                    placeholder="Ej: frente al parque"
+                    className={`${inputCls} resize-none`}
+                    rows={2}
+                  />
+                </div>
+              </>
+            )}
+
+            {tipoEdificacion === 'Edificio / Condominio' && (
+              <>
+                <div>
+                  <label className={labelCls}>Nombre del edificio / condominio</label>
+                  <input
+                    type="text"
+                    value={nombreEdificio}
+                    onChange={e => setNombreEdificio(e.target.value)}
+                    placeholder="Ej: Edificio Palmeras"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Torre / Piso / Departamento</label>
+                  <input
+                    type="text"
+                    value={pisoDpto}
+                    onChange={e => setPisoDpto(e.target.value)}
+                    placeholder="Ej: Torre A, Piso 3, Dpto 12"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Referencias</label>
+                  <textarea
+                    value={referencia}
+                    onChange={e => setReferencia(e.target.value)}
+                    placeholder="Ej: portón azul"
+                    className={`${inputCls} resize-none`}
+                    rows={2}
+                  />
+                </div>
+              </>
+            )}
+
+            {tipoEdificacion === 'Centro comercial / Local comercial' && (
+              <>
+                <div>
+                  <label className={labelCls}>Nombre del comercio / número del local</label>
+                  <input
+                    type="text"
+                    value={nombreComercio}
+                    onChange={e => setNombreComercio(e.target.value)}
+                    placeholder="Ej: Local 42 — Patio Olmos"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Referencias</label>
+                  <textarea
+                    value={referencia}
+                    onChange={e => setReferencia(e.target.value)}
+                    placeholder="Ej: planta baja, frente a la escalera"
+                    className={`${inputCls} resize-none`}
+                    rows={2}
+                  />
+                </div>
+              </>
+            )}
+
+            {tipoEdificacion === 'Otro' && (
+              <>
+                <div>
+                  <label className={labelCls}>Nombre del lugar</label>
+                  <input
+                    type="text"
+                    value={nombreLugar}
+                    onChange={e => setNombreLugar(e.target.value)}
+                    placeholder="Ej: Club Náutico"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Referencias</label>
+                  <textarea
+                    value={referencia}
+                    onChange={e => setReferencia(e.target.value)}
+                    placeholder="Ej: entrada principal"
+                    className={`${inputCls} resize-none`}
+                    rows={2}
+                    required
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -278,9 +481,21 @@ export default function CheckoutPage() {
               )
             })}
           </div>
+          {formaEntrega === 'Delivery' && menu?.local.costoEnvio != null && (
+            <div className="px-4 py-2 border-t border-[#e8e8e8] flex justify-between text-sm text-[#666]">
+              <span>Costo de envío</span>
+              <span>${menu.local.costoEnvio.toLocaleString('es-AR')}</span>
+            </div>
+          )}
           <div className="px-4 py-3 border-t border-[#e8e8e8] flex justify-between font-bold">
             <span>Total</span>
-            <span>${total.toLocaleString('es-AR')}</span>
+            <span>
+              ${(
+                formaEntrega === 'Delivery' && menu?.local.costoEnvio != null
+                  ? total + menu.local.costoEnvio
+                  : total
+              ).toLocaleString('es-AR')}
+            </span>
           </div>
         </div>
 
