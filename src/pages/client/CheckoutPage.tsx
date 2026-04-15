@@ -92,10 +92,7 @@ export default function CheckoutPage() {
       detalles: items.map(item => ({
         productoId: item.producto.id,
         cantidad: item.cantidad,
-        precioUnitario:
-          item.producto.precio +
-          item.extras.reduce((s, e) => s + e.precioAdicional, 0),
-        extrasIds: item.extras.map(e => e.id),
+        extrasSeleccionados: item.extras.map(e => e.id),
       })),
       ...(formaEntrega === 'Delivery' && {
         direccionCliente: direccion.trim(),

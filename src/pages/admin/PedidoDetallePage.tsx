@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import AdminLayout from '../../components/admin/AdminLayout'
-import { getPedidoById, updateEstadoPedido } from '../../api/adminApi'
+import { getPedidoById, updateEstadoPedido, getComentariosPedido, addComentarioPedido, getComanda, getTicket } from '../../api/adminApi'
+import type { ComentarioPedido, ComandaResponseDTO, TicketResponseDTO } from '../../api/adminApi'
+import ImpresionModal from '../../components/admin/ImpresionModal'
 import type { Pedido, EstadoPedido } from '../../types'
+
+const MAX_CHARS = 500
+
+function formatComentarioFecha(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) +
+    ', ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+}
 
 const ESTADOS: EstadoPedido[] = ['Pendiente', 'EnPreparacion', 'Listo', 'Entregado', 'Cancelado']
 
@@ -38,6 +48,43 @@ export default function PedidoDetallePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [comentarios, setComentarios] = useState<ComentarioPedido[]>([])
+  const [comentariosLoading, setComentariosLoading] = useState(true)
+  const [comentariosError, setComentariosError] = useState<string | null>(null)
+  const [nuevoTexto, setNuevoTexto] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [envioError, setEnvioError] = useState<string | null>(null)
+
+  type ModalState =
+    | { tipo: 'comanda'; datos: ComandaResponseDTO }
+    | { tipo: 'ticket';  datos: TicketResponseDTO  }
+    | null
+  const [modal, setModal] = useState<ModalState>(null)
+  const [loadingComanda, setLoadingComanda] = useState(false)
+  const [loadingTicket, setLoadingTicket] = useState(false)
+
+  const handleOpenComanda = async () => {
+    if (!id) return
+    setLoadingComanda(true)
+    try {
+      const datos = await getComanda(Number(id))
+      setModal({ tipo: 'comanda', datos })
+    } finally {
+      setLoadingComanda(false)
+    }
+  }
+
+  const handleOpenTicket = async () => {
+    if (!id) return
+    setLoadingTicket(true)
+    try {
+      const datos = await getTicket(Number(id))
+      setModal({ tipo: 'ticket', datos })
+    } finally {
+      setLoadingTicket(false)
+    }
+  }
+
   useEffect(() => {
     if (!id) return
     getPedidoById(Number(id))
@@ -47,7 +94,26 @@ export default function PedidoDetallePage() {
       })
       .catch(() => setError('No se pudo cargar el pedido.'))
       .finally(() => setLoading(false))
+    getComentariosPedido(Number(id))
+      .then(data => setComentarios(data.sort((a, b) => new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime())))
+      .catch(() => setComentariosError('No se pudieron cargar los comentarios.'))
+      .finally(() => setComentariosLoading(false))
   }, [id])
+
+  const handleAddComentario = async () => {
+    if (!id || !nuevoTexto.trim()) return
+    setEnviando(true)
+    setEnvioError(null)
+    try {
+      const creado = await addComentarioPedido(Number(id), nuevoTexto.trim())
+      setComentarios(prev => [...prev, creado])
+      setNuevoTexto('')
+    } catch {
+      setEnvioError('No se pudo agregar el comentario.')
+    } finally {
+      setEnviando(false)
+    }
+  }
 
   const handleSaveEstado = async () => {
     if (!pedido) return
@@ -65,18 +131,40 @@ export default function PedidoDetallePage() {
     }
   }
 
-  const backBtn = (
-    <button
-      onClick={() => navigate('/admin/pedidos')}
-      className="text-sm text-[#aaa] hover:text-[#1a1a1a] transition-colors"
-    >
-      ← Volver
-    </button>
+  const printBtnStyle: React.CSSProperties = {
+    padding: '5px 14px', fontSize: 12, fontWeight: 600,
+    background: '#fff', color: '#1a1a1a',
+    border: '1px solid #1a1a1a', borderRadius: 0, cursor: 'pointer',
+  }
+
+  const headerActions = (
+    <>
+      <button
+        onClick={handleOpenComanda}
+        disabled={loadingComanda}
+        style={{ ...printBtnStyle, opacity: loadingComanda ? 0.5 : 1 }}
+      >
+        {loadingComanda ? '…' : 'Imprimir comanda'}
+      </button>
+      <button
+        onClick={handleOpenTicket}
+        disabled={loadingTicket}
+        style={{ ...printBtnStyle, opacity: loadingTicket ? 0.5 : 1 }}
+      >
+        {loadingTicket ? '…' : 'Imprimir ticket'}
+      </button>
+      <button
+        onClick={() => navigate('/admin/pedidos')}
+        className="text-sm text-[#aaa] hover:text-[#1a1a1a] transition-colors"
+      >
+        ← Volver
+      </button>
+    </>
   )
 
   if (loading) {
     return (
-      <AdminLayout title="Pedido" actions={backBtn}>
+      <AdminLayout title="Pedido" actions={headerActions}>
         <p className="text-sm text-[#aaa] py-8 text-center">Cargando…</p>
       </AdminLayout>
     )
@@ -84,14 +172,14 @@ export default function PedidoDetallePage() {
 
   if (error || !pedido) {
     return (
-      <AdminLayout title="Pedido" actions={backBtn}>
+      <AdminLayout title="Pedido" actions={headerActions}>
         <p className="text-sm text-red-600 py-8 text-center">{error ?? 'Error desconocido.'}</p>
       </AdminLayout>
     )
   }
 
   return (
-    <AdminLayout title={`Pedido #${pedido.id}`} actions={backBtn}>
+    <AdminLayout title={`Pedido #${pedido.id}`} actions={headerActions}>
       <div className="max-w-2xl space-y-5">
 
         {/* Estado selector */}
@@ -206,10 +294,14 @@ export default function PedidoDetallePage() {
                   <span className="font-medium">
                     {d.cantidad}× {d.nombreProducto ?? `Producto #${d.productoId}`}
                   </span>
-                  {(d.productosExtra ?? []).length > 0 && (
-                    <p className="text-xs text-[#aaa] mt-0.5">
-                      + {(d.productosExtra ?? []).map(e => e.nombre).join(', ')}
-                    </p>
+                  {(d.extras ?? []).length > 0 && (
+                    <div className="mt-1">
+                      {(d.extras ?? []).map((e, i) => (
+                        <p key={i} className="text-xs pl-3" style={{ color: '#666' }}>
+                          + {e.nombre} — ${e.precioAdicional.toLocaleString('es-AR')}
+                        </p>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <span className="font-bold ml-4 shrink-0">
@@ -224,7 +316,93 @@ export default function PedidoDetallePage() {
           </div>
         </Section>
 
+        {/* Comentarios internos */}
+        <div style={{ background: '#f5f5f5', border: '1px solid #e8e8e8' }}>
+          <div className="px-5 py-3 border-b border-[#e8e8e8]" style={{ backgroundColor: '#efefef' }}>
+            <p className={labelCls}>Comentarios internos</p>
+            <p className="text-xs text-[#aaa] mt-0.5">Solo visibles para el administrador</p>
+          </div>
+          <div className="px-5 py-4 space-y-4">
+            {comentariosLoading && (
+              <p className="text-sm text-[#aaa]">Cargando comentarios…</p>
+            )}
+            {comentariosError && (
+              <p className="text-sm text-red-600">{comentariosError}</p>
+            )}
+            {!comentariosLoading && !comentariosError && comentarios.length === 0 && (
+              <p className="text-sm text-[#aaa]">Sin comentarios internos.</p>
+            )}
+            {!comentariosLoading && !comentariosError && comentarios.length > 0 && (
+              <div className="space-y-0">
+                {comentarios.map((c, i) => (
+                  <div key={c.id}>
+                    <div className="py-3">
+                      <p className="text-sm text-[#1a1a1a] whitespace-pre-wrap">{c.texto}</p>
+                      <p className="text-xs text-[#aaa] mt-1">{formatComentarioFecha(c.fechaCreacion)}</p>
+                    </div>
+                    {i < comentarios.length - 1 && (
+                      <div style={{ borderTop: '1px solid #e0e0e0' }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Formulario */}
+            <div className="space-y-2 pt-2">
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  value={nuevoTexto}
+                  onChange={e => setNuevoTexto(e.target.value.slice(0, MAX_CHARS))}
+                  placeholder="Escribir comentario interno…"
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    border: '1px solid #1a1a1a',
+                    borderRadius: 0,
+                    padding: '8px 10px',
+                    fontSize: '13px',
+                    resize: 'vertical',
+                    outline: 'none',
+                    background: '#fff',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: '#aaa' }}>
+                  {nuevoTexto.length}/{MAX_CHARS}
+                </span>
+                <button
+                  onClick={handleAddComentario}
+                  disabled={enviando || nuevoTexto.trim().length === 0}
+                  style={{
+                    padding: '6px 16px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    background: '#1a1a1a',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 0,
+                    cursor: enviando || nuevoTexto.trim().length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: enviando || nuevoTexto.trim().length === 0 ? 0.4 : 1,
+                  }}
+                >
+                  {enviando ? 'Enviando…' : 'Agregar comentario'}
+                </button>
+              </div>
+              {envioError && (
+                <p className="text-sm text-red-600">{envioError}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
       </div>
+
+      {modal && (
+        <ImpresionModal {...modal} onClose={() => setModal(null)} />
+      )}
     </AdminLayout>
   )
 }

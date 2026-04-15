@@ -1,9 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminLayout from '../../components/admin/AdminLayout'
 import { getPedidos } from '../../api/adminApi'
+import type { PedidosFiltros } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
+import { usePedidosHub } from '../../hooks/usePedidosHub'
+import NuevoPedidoToast from '../../components/NuevoPedidoToast'
 import type { Pedido, FormaPago, FormaEntrega } from '../../types'
+
+const FILTROS_VACIOS: PedidosFiltros = {
+  estado: '', desde: '', hasta: '', formaPago: '', formaEntrega: '',
+}
+
+interface NuevoPedidoPayload {
+  pedidoId: number
+  codigoSeguimiento: string
+  nombreCliente: string
+  total: number
+  fechaCreacion: string
+}
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   // Valores del tipo TypeScript
@@ -46,20 +61,133 @@ export default function PedidosPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [nuevoPedido, setNuevoPedido] = useState<NuevoPedidoPayload | null>(null)
+  const [draftFiltros, setDraftFiltros] = useState<PedidosFiltros>(FILTROS_VACIOS)
+  const [activeFiltros, setActiveFiltros] = useState<PedidosFiltros>(FILTROS_VACIOS)
 
-  useEffect(() => {
+  const fetchPedidos = useCallback(() => {
     if (!adminId) return
-    getPedidos(adminId)
+    getPedidos(adminId, activeFiltros)
       .then(data => {
-        // Sort newest first
         setPedidos([...data].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()))
       })
       .catch(() => setError('No se pudieron cargar los pedidos.'))
       .finally(() => setLoading(false))
-  }, [adminId])
+  }, [adminId, activeFiltros])
+
+  useEffect(() => {
+    fetchPedidos()
+  }, [fetchPedidos])
+
+  const handleNuevoPedido = useCallback((pedido: NuevoPedidoPayload) => {
+    setNuevoPedido(pedido)
+    fetchPedidos()
+  }, [fetchPedidos])
+
+  usePedidosHub({ adminId, onNuevoPedido: handleNuevoPedido })
+
+  const inputStyle: React.CSSProperties = {
+    border: '1px solid #d0d0d0',
+    borderRadius: 0,
+    padding: '6px 10px',
+    fontSize: '13px',
+    color: '#1a1a1a',
+    background: '#fff',
+    outline: 'none',
+  }
 
   return (
     <AdminLayout title="Pedidos" subtitle={todayLabel()}>
+      {/* ── Filtros ── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px', alignItems: 'flex-end' }}>
+        <select
+          value={draftFiltros.estado}
+          onChange={e => setDraftFiltros(f => ({ ...f, estado: e.target.value }))}
+          style={inputStyle}
+        >
+          <option value="">Estado: todos</option>
+          <option value="Pendiente">Pendiente</option>
+          <option value="Confirmado">Confirmado</option>
+          <option value="EnPreparacion">En preparación</option>
+          <option value="Listo">Listo</option>
+          <option value="Entregado">Entregado</option>
+          <option value="Cancelado">Cancelado</option>
+        </select>
+
+        <select
+          value={draftFiltros.formaPago}
+          onChange={e => setDraftFiltros(f => ({ ...f, formaPago: e.target.value }))}
+          style={inputStyle}
+        >
+          <option value="">Pago: todos</option>
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia</option>
+          <option value="MercadoPago">MercadoPago</option>
+        </select>
+
+        <select
+          value={draftFiltros.formaEntrega}
+          onChange={e => setDraftFiltros(f => ({ ...f, formaEntrega: e.target.value }))}
+          style={inputStyle}
+        >
+          <option value="">Entrega: todas</option>
+          <option value="Delivery">Delivery</option>
+          <option value="Local">Retira</option>
+        </select>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <label style={{ fontSize: '12px', color: '#888' }}>Desde</label>
+          <input
+            type="date"
+            value={draftFiltros.desde}
+            onChange={e => setDraftFiltros(f => ({ ...f, desde: e.target.value }))}
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <label style={{ fontSize: '12px', color: '#888' }}>Hasta</label>
+          <input
+            type="date"
+            value={draftFiltros.hasta}
+            onChange={e => setDraftFiltros(f => ({ ...f, hasta: e.target.value }))}
+            style={inputStyle}
+          />
+        </div>
+
+        <button
+          onClick={() => { setLoading(true); setError(null); setActiveFiltros({ ...draftFiltros }) }}
+          style={{
+            padding: '6px 16px',
+            fontSize: '13px',
+            fontWeight: 600,
+            background: '#1a1a1a',
+            color: '#fff',
+            border: '1px solid #1a1a1a',
+            borderRadius: 0,
+            cursor: 'pointer',
+          }}
+        >
+          Filtrar
+        </button>
+
+        <button
+          onClick={() => { setDraftFiltros(FILTROS_VACIOS); setLoading(true); setError(null); setActiveFiltros(FILTROS_VACIOS) }}
+          style={{
+            padding: '6px 16px',
+            fontSize: '13px',
+            fontWeight: 600,
+            background: '#fff',
+            color: '#1a1a1a',
+            border: '1px solid #1a1a1a',
+            borderRadius: 0,
+            cursor: 'pointer',
+          }}
+        >
+          Limpiar
+        </button>
+      </div>
+
       {loading && (
         <p className="text-sm text-[#aaa] py-8 text-center">Cargando pedidos…</p>
       )}
@@ -120,6 +248,12 @@ export default function PedidosPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {nuevoPedido && (
+        <NuevoPedidoToast
+          pedido={nuevoPedido}
+          onClose={() => setNuevoPedido(null)}
+        />
       )}
     </AdminLayout>
   )

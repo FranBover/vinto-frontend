@@ -16,8 +16,22 @@ export const loginAdmin = async (email: string, password: string): Promise<{ tok
 
 // ── Pedidos ───────────────────────────────────────────────────────────────────
 
-export const getPedidos = async (adminId: number): Promise<Pedido[]> => {
-  const { data } = await apiClient.get<Pedido[]>(`/pedidos?adminId=${adminId}`)
+export interface PedidosFiltros {
+  estado?: string
+  desde?: string
+  hasta?: string
+  formaPago?: string
+  formaEntrega?: string
+}
+
+export const getPedidos = async (adminId: number, filtros?: PedidosFiltros): Promise<Pedido[]> => {
+  const params = new URLSearchParams({ adminId: adminId.toString() })
+  if (filtros?.estado)       params.set('estado',       filtros.estado)
+  if (filtros?.desde)        params.set('desde',        filtros.desde)
+  if (filtros?.hasta)        params.set('hasta',        filtros.hasta)
+  if (filtros?.formaPago)    params.set('formaPago',    filtros.formaPago)
+  if (filtros?.formaEntrega) params.set('formaEntrega', filtros.formaEntrega)
+  const { data } = await apiClient.get<Pedido[]>(`/pedidos?${params}`)
   return data
 }
 
@@ -126,6 +140,79 @@ export const updateLocalData = async (id: number, payload: {
   costoEnvio?: number | null
 }) => {
   const { data } = await apiClient.patch(`/Administrador/${id}/local`, payload)
+  return data
+}
+
+// ── Comanda / Ticket ──────────────────────────────────────────────────────────
+
+export interface ComandaItem {
+  cantidad: number
+  nombreProducto: string
+  extras: string[]
+}
+
+export interface ComandaResponseDTO {
+  codigoSeguimiento: string
+  fecha: string
+  formaEntrega: string
+  nombreCliente: string
+  direccionCliente: string | null
+  referenciaDireccion: string | null
+  items: ComandaItem[]
+}
+
+export interface TicketItem {
+  cantidad: number
+  nombreProducto: string
+  precioUnitario: number
+  subtotal: number
+  extras: { nombre: string; precioAdicional: number }[]
+}
+
+export interface TicketResponseDTO {
+  codigoSeguimiento: string
+  nombreLocal: string
+  telefono: string
+  fecha: string
+  nombreCliente: string
+  telefonoCliente: string
+  formaEntrega: string
+  direccionCliente: string | null
+  referenciaDireccion: string | null
+  formaPago: string
+  items: TicketItem[]
+  subtotal: number
+  costoEnvio: number
+  total: number
+  montoPagoEfectivo: number | null
+  vuelto: number | null
+}
+
+export const getComanda = async (pedidoId: number): Promise<ComandaResponseDTO> => {
+  const { data } = await apiClient.get<ComandaResponseDTO>(`/pedidos/${pedidoId}/comanda`)
+  return data
+}
+
+export const getTicket = async (pedidoId: number): Promise<TicketResponseDTO> => {
+  const { data } = await apiClient.get<TicketResponseDTO>(`/pedidos/${pedidoId}/ticket`)
+  return data
+}
+
+// ── Comentarios de pedido ─────────────────────────────────────────────────────
+
+export interface ComentarioPedido {
+  id: number
+  texto: string
+  fechaCreacion: string
+}
+
+export const getComentariosPedido = async (pedidoId: number): Promise<ComentarioPedido[]> => {
+  const { data } = await apiClient.get<ComentarioPedido[]>(`/pedidos/${pedidoId}/comentarios`)
+  return data
+}
+
+export const addComentarioPedido = async (pedidoId: number, texto: string): Promise<ComentarioPedido> => {
+  const { data } = await apiClient.post<ComentarioPedido>(`/pedidos/${pedidoId}/comentarios`, { texto })
   return data
 }
 

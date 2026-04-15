@@ -47,6 +47,11 @@ export type EstadoPedido = 'Pendiente' | 'EnPreparacion' | 'Listo' | 'Entregado'
 export type FormaPago = 'Efectivo' | 'Transferencia' | 'Tarjeta'
 export type FormaEntrega = 'Local' | 'Delivery'
 
+export interface DetallePedidoExtra {
+  nombre: string
+  precioAdicional: number
+}
+
 export interface DetallePedido {
   id: number
   pedidoId: number
@@ -54,7 +59,7 @@ export interface DetallePedido {
   nombreProducto?: string
   cantidad: number
   precioUnitario: number
-  productosExtra: ProductoExtra[]
+  extras: DetallePedidoExtra[]
 }
 
 export interface Pedido {
@@ -92,8 +97,7 @@ export interface PedidoCreateResponse {
 export interface CrearDetalleDto {
   productoId: number
   cantidad: number
-  precioUnitario: number
-  extrasIds: number[]
+  extrasSeleccionados: number[]
 }
 
 export interface CrearPedidoDto {
