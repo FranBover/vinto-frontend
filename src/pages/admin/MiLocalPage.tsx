@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from '../../components/admin/AdminLayout'
-import { getAdministrador, updateLocalData } from '../../api/adminApi'
+import { getAdministrador, updateLocalData, getImagenes } from '../../api/adminApi'
+import type { ImagenResponse } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
 import type { Administrador } from '../../types'
+import ImageUploader from '../../components/admin/ImageUploader'
 
 const inputCls =
   'w-full border border-[#d0d0d0] px-3 py-2.5 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white transition-colors'
@@ -30,11 +32,15 @@ export default function MiLocalPage() {
   const [ubicacionUrl, setUbicacionUrl] = useState('')
   const [zonaEnvio, setZonaEnvio] = useState<'Ciudad' | 'Nacional'>('Nacional')
   const [costoEnvio, setCostoEnvio] = useState('')
+  const [logoImagenes, setLogoImagenes] = useState<ImagenResponse[]>([])
 
   useEffect(() => {
     if (!adminId) return
-    getAdministrador(adminId)
-      .then((a: Administrador) => {
+    Promise.all([
+      getAdministrador(adminId),
+      getImagenes('logo'),
+    ])
+      .then(([a, imgs]: [Administrador, ImagenResponse[]]) => {
         setAdmin(a)
         setEsActivo(a.esAbierto)
         setNombreLocal(a.nombreLocal)
@@ -48,6 +54,7 @@ export default function MiLocalPage() {
         setUbicacionUrl(a.ubicacionUrl ?? '')
         setZonaEnvio(a.zonaEnvio ?? 'Nacional')
         setCostoEnvio(a.costoEnvio != null ? String(a.costoEnvio) : '')
+        setLogoImagenes(imgs)
       })
       .catch(() => setError('No se pudieron cargar los datos del local.'))
       .finally(() => setLoading(false))
@@ -267,19 +274,16 @@ export default function MiLocalPage() {
               />
             </div>
             <div>
-              <label className={labelCls}>URL del logo</label>
-              <input
-                className={inputCls}
-                type="url"
-                value={logoUrl}
-                onChange={e => setLogoUrl(e.target.value)}
-                placeholder="https://..."
+              <label className={labelCls}>Logo del local</label>
+              <ImageUploader
+                imagenes={logoImagenes}
+                tipo="logo"
+                onImagenesChange={setLogoImagenes}
+                maxImagenes={1}
               />
-              {logoUrl && (
-                <div className="mt-3 w-16 h-16 border border-[#e8e8e8] overflow-hidden">
-                  <img src={logoUrl} alt="Logo preview" className="w-full h-full object-cover" />
-                </div>
-              )}
+              <p className="mt-1.5 text-xs text-[#aaa]">
+                Subí una imagen directamente. Si ya hay un logo, se reemplaza automáticamente.
+              </p>
             </div>
           </div>
 

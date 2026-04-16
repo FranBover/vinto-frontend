@@ -3,9 +3,12 @@ import AdminLayout from '../../components/admin/AdminLayout'
 import {
   getProductos, createProducto, updateProducto, toggleDisponibilidad,
   getCategorias, getExtras, createExtra, deleteExtra,
+  getImagenes, uploadImagen,
 } from '../../api/adminApi'
+import type { ImagenResponse } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
 import type { Producto, Categoria, ProductoExtra } from '../../types'
+import ImageUploader from '../../components/admin/ImageUploader'
 
 interface ProductoForm {
   nombre: string
@@ -46,6 +49,10 @@ export default function ProductosAdminPage() {
   const [newExtraPrecio, setNewExtraPrecio] = useState('')
   const [addingExtra, setAddingExtra] = useState(false)
 
+  // Images state
+  const [imagenes, setImagenes] = useState<ImagenResponse[]>([])
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+
   useEffect(() => {
     if (!adminId) return
     Promise.all([getProductos(adminId), getCategorias(adminId)])
@@ -60,6 +67,8 @@ export default function ProductosAdminPage() {
     setEditingProducto(null)
     setForm(EMPTY_FORM)
     setExtras([])
+    setImagenes([])
+    setPendingFiles([])
     setDrawerOpen(true)
   }
 
@@ -73,9 +82,15 @@ export default function ProductosAdminPage() {
       disponible: p.disponible,
       imagenUrl: p.imagenUrl ?? '',
     })
+    setImagenes([])
+    setPendingFiles([])
     setDrawerOpen(true)
-    const freshExtras = await getExtras(p.id)
+    const [freshExtras, freshImages] = await Promise.all([
+      getExtras(p.id),
+      getImagenes('producto', p.id),
+    ])
     setExtras(freshExtras)
+    setImagenes(freshImages)
   }
 
   function closeDrawer() {
@@ -83,6 +98,8 @@ export default function ProductosAdminPage() {
     setEditingProducto(null)
     setNewExtraNombre('')
     setNewExtraPrecio('')
+    setImagenes([])
+    setPendingFiles([])
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -100,10 +117,18 @@ export default function ProductosAdminPage() {
       }
       if (editingProducto) {
         const updated = await updateProducto(editingProducto.id, payload)
-        setEditingProducto({ ...updated, extras })
+        setEditingProducto({ ...updated, extras, imagenes })
       } else {
         const created = await createProducto({ ...payload, administradorId: adminId } as Parameters<typeof createProducto>[0])
-        setEditingProducto({ ...created, extras: [] })
+        // Upload any pending images now that we have the product id
+        const uploadedImages: ImagenResponse[] = []
+        for (let i = 0; i < pendingFiles.length; i++) {
+          const img = await uploadImagen(pendingFiles[i], 'producto', created.id, i + 1)
+          uploadedImages.push(img)
+        }
+        setPendingFiles([])
+        setImagenes(uploadedImages)
+        setEditingProducto({ ...created, extras: [], imagenes: uploadedImages })
         setExtras([])
       }
       const fresh = await getProductos(adminId)
@@ -313,14 +338,21 @@ export default function ProductosAdminPage() {
                 </div>
               </div>
               <div>
-                <label className={labelCls}>URL de imagen</label>
-                <input
-                  className={inputCls}
-                  type="url"
-                  value={form.imagenUrl}
-                  onChange={e => setForm(f => ({ ...f, imagenUrl: e.target.value }))}
-                  placeholder="https://…"
+                <label className={labelCls}>Imágenes</label>
+                <ImageUploader
+                  imagenes={imagenes}
+                  tipo="producto"
+                  entidadId={editingProducto?.id}
+                  onImagenesChange={setImagenes}
+                  deferred={!editingProducto}
+                  onPendingFilesChange={setPendingFiles}
+                  maxImagenes={5}
                 />
+                {!editingProducto && pendingFiles.length > 0 && (
+                  <p className="mt-1.5 text-xs text-[#aaa]">
+                    {pendingFiles.length} imagen{pendingFiles.length !== 1 ? 'es' : ''} se subirá{pendingFiles.length !== 1 ? 'n' : ''} al crear el producto.
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <input

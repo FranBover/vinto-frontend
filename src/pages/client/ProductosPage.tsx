@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
 import CartBar from '../../components/client/CartBar'
+import { BASE_URL } from '../../config'
+import type { Producto } from '../../types'
+
+function resolveImageUrl(producto: Producto): string | null {
+  if (producto.imagenes && producto.imagenes.length > 0) {
+    return BASE_URL + producto.imagenes[0].url
+  }
+  if (producto.imagenUrl) return producto.imagenUrl
+  return null
+}
 
 export default function ProductosPage() {
   const { slug, categoriaId } = useParams<{ slug: string; categoriaId: string }>()
@@ -64,49 +74,52 @@ export default function ProductosPage() {
             No hay productos disponibles en esta categoría.
           </li>
         ) : (
-          productos.map(producto => (
-            <li key={producto.id} className="border-b border-[#e8e8e8]">
-              <div className="flex items-start justify-between gap-4 px-4 py-5">
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-[15px] leading-tight">{producto.nombre}</p>
-                  {producto.descripcion && (
-                    <p className="text-sm text-[#888] mt-1 leading-snug line-clamp-2">
-                      {producto.descripcion}
-                    </p>
-                  )}
-                  <p className="font-bold text-sm mt-2">
-                    ${producto.precio.toLocaleString('es-AR')}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-2 shrink-0">
-                  <div className="w-[60px] h-[60px] overflow-hidden bg-[#f5f5f5]">
-                    {producto.imagenUrl && !imgErrors.has(producto.id) ? (
-                      <img
-                        src={producto.imagenUrl}
-                        alt={producto.nombre}
-                        className="w-full h-full object-cover"
-                        onError={() => setImgErrors(prev => new Set(prev).add(producto.id))}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl select-none">
-                        🍽️
-                      </div>
+          productos.map(producto => {
+            const imgSrc = resolveImageUrl(producto)
+            return (
+              <li key={producto.id} className="border-b border-[#e8e8e8]">
+                <div className="flex items-start justify-between gap-4 px-4 py-5">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[15px] leading-tight">{producto.nombre}</p>
+                    {producto.descripcion && (
+                      <p className="text-sm text-[#888] mt-1 leading-snug line-clamp-2">
+                        {producto.descripcion}
+                      </p>
                     )}
+                    <p className="font-bold text-sm mt-2">
+                      ${producto.precio.toLocaleString('es-AR')}
+                    </p>
                   </div>
-                  <button
-                    onClick={() =>
-                      navigate(`/${slug}/productos/${categoriaId}/${producto.id}`)
-                    }
-                    disabled={!isOpen}
-                    aria-label={`Agregar ${producto.nombre}`}
-                    className="w-9 h-9 bg-[#1a1a1a] text-white flex items-center justify-center font-bold text-xl rounded-none disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    +
-                  </button>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <div className="w-[60px] h-[60px] overflow-hidden bg-[#f5f5f5]">
+                      {imgSrc && !imgErrors.has(producto.id) ? (
+                        <img
+                          src={imgSrc}
+                          alt={producto.nombre}
+                          className="w-full h-full object-cover"
+                          onError={() => setImgErrors(prev => new Set(prev).add(producto.id))}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-2xl select-none">
+                          🍽️
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() =>
+                        navigate(`/${slug}/productos/${categoriaId}/${producto.id}`)
+                      }
+                      disabled={!isOpen}
+                      aria-label={`Agregar ${producto.nombre}`}
+                      className="w-9 h-9 bg-[#1a1a1a] text-white flex items-center justify-center font-bold text-xl rounded-none disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </li>
-          ))
+              </li>
+            )
+          })
         )}
       </ul>
 

@@ -5,7 +5,10 @@ import type {
   Producto,
   Categoria,
   ProductoExtra,
+  ImagenResponse,
 } from '../types'
+
+export type { ImagenResponse }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -214,6 +217,38 @@ export const getComentariosPedido = async (pedidoId: number): Promise<Comentario
 export const addComentarioPedido = async (pedidoId: number, texto: string): Promise<ComentarioPedido> => {
   const { data } = await apiClient.post<ComentarioPedido>(`/pedidos/${pedidoId}/comentarios`, { texto })
   return data
+}
+
+// ── Imágenes ──────────────────────────────────────────────────────────────────
+
+export const getImagenes = async (tipo: string, entidadId?: number): Promise<ImagenResponse[]> => {
+  const params = new URLSearchParams({ tipo })
+  if (entidadId !== undefined) params.set('entidadId', String(entidadId))
+  const { data } = await apiClient.get<ImagenResponse[]>(`/Imagenes?${params}`)
+  return data
+}
+
+export const uploadImagen = async (
+  file: File,
+  tipo: string,
+  entidadId?: number,
+  orden?: number,
+): Promise<ImagenResponse> => {
+  const formData = new FormData()
+  formData.append('File', file)
+  formData.append('Tipo', tipo)
+  if (entidadId !== undefined) formData.append('EntidadId', String(entidadId))
+  if (orden !== undefined) formData.append('Orden', String(orden))
+    const { data } = await apiClient.post<ImagenResponse>('/Imagenes/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  return data
+}
+
+export const deleteImagen = async (imagenId: number): Promise<void> => {
+  await apiClient.delete(`/Imagenes/${imagenId}`)
 }
 
 // ── Reportes ──────────────────────────────────────────────────────────────────

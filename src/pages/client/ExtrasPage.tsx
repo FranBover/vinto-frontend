@@ -2,7 +2,19 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
 import { useCartStore } from '../../store/cartStore'
-import type { ProductoExtra } from '../../types'
+import type { Producto, ProductoExtra } from '../../types'
+import { BASE_URL } from '../../config'
+
+function resolveImages(producto: Producto): string[] {
+  if (producto.imagenes && producto.imagenes.length > 0) {
+    return producto.imagenes
+      .slice()
+      .sort((a, b) => a.orden - b.orden)
+      .map(i => BASE_URL + i.url)
+  }
+  if (producto.imagenUrl) return [producto.imagenUrl]
+  return []
+}
 
 export default function ExtrasPage() {
   const { slug, categoriaId, productoId } = useParams<{
@@ -16,7 +28,8 @@ export default function ExtrasPage() {
 
   const [selectedExtras, setSelectedExtras] = useState<ProductoExtra[]>([])
   const [cantidad, setCantidad] = useState(1)
-  const [imgError, setImgError] = useState(false)
+  const [imgIndex, setImgIndex] = useState(0)
+  const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
     if (slug) fetchMenu(slug)
@@ -34,6 +47,10 @@ export default function ExtrasPage() {
       </div>
     )
   }
+
+  const images = resolveImages(producto)
+  const activeIndex = Math.min(imgIndex, Math.max(0, images.length - 1))
+  const canNavigate = images.length > 1
 
   const toggleExtra = (extra: ProductoExtra) => {
     setSelectedExtras(prev =>
@@ -70,21 +87,73 @@ export default function ExtrasPage() {
       {/* ── Scrollable content ─────────────────────────────────── */}
       <div className="flex-1 overflow-auto pb-24">
 
-        {/* Hero */}
-        <div className="w-full h-40 bg-[#f5f5f5] flex items-center justify-center overflow-hidden">
-          {producto.imagenUrl && !imgError ? (
-            <img
-              src={producto.imagenUrl}
-              alt={producto.nombre}
-              className="w-full h-full object-cover"
-              onError={() => setImgError(true)}
-            />
+        {/* Hero / Carousel */}
+        <div
+          className="product-hero relative w-full bg-[#f5f5f5] overflow-hidden"
+          style={{ height: 260 }}
+        >
+          {images.length === 0 ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-6xl select-none" role="img" aria-label="Plato">🍽️</span>
+            </div>
           ) : (
-            <span className="text-6xl select-none" role="img" aria-label="Plato">
-              🍽️
-            </span>
+            <>
+              {imgErrors[activeIndex] ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-6xl select-none" role="img" aria-label="Plato">🍽️</span>
+                </div>
+              ) : (
+                <img
+                  key={activeIndex}
+                  src={images[activeIndex]}
+                  alt={producto.nombre}
+                  onError={() => setImgErrors(prev => ({ ...prev, [activeIndex]: true }))}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
+                />
+              )}
+
+              {/* Arrows */}
+              {canNavigate && (
+                <>
+                  <button
+                    onClick={() => setImgIndex(i => (i - 1 + images.length) % images.length)}
+                    aria-label="Anterior"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 text-white flex items-center justify-center"
+                    style={{ borderRadius: 0 }}
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={() => setImgIndex(i => (i + 1) % images.length)}
+                    aria-label="Siguiente"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 text-white flex items-center justify-center"
+                    style={{ borderRadius: 0 }}
+                  >
+                    ›
+                  </button>
+                </>
+              )}
+
+              {/* Dots */}
+              {canNavigate && (
+                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+                  {images.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setImgIndex(i)}
+                      aria-label={`Imagen ${i + 1}`}
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: i === activeIndex ? '#1a1a1a' : '#ccc' }}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
+
+        {/* Responsive height override for desktop */}
+        <style>{`@media (min-width: 768px) { .product-hero { height: 380px !important; } }`}</style>
 
         {/* Product info */}
         <div className="px-4 py-5 border-b border-[#e8e8e8]">

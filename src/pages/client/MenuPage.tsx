@@ -60,9 +60,9 @@ export default function MenuPage() {
         </button>
 
         <div className="w-10 h-10 overflow-hidden shrink-0">
-          {local.logoUrl && !logoError ? (
+          {(local.logoImagenUrl || local.logoUrl) && !logoError ? (
             <img
-              src={local.logoUrl}
+              src={(local.logoImagenUrl || local.logoUrl)!}
               alt={local.nombreLocal}
               className="w-full h-full object-cover"
               onError={() => setLogoError(true)}
@@ -94,9 +94,9 @@ export default function MenuPage() {
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 shrink-0 overflow-hidden">
-              {local.logoUrl && !logoError ? (
+              {(local.logoImagenUrl || local.logoUrl) && !logoError ? (
                 <img
-                  src={local.logoUrl}
+                  src={(local.logoImagenUrl || local.logoUrl)!}
                   alt={local.nombreLocal}
                   className="w-full h-full object-cover"
                   onError={() => setLogoError(true)}

@@ -1,5 +1,16 @@
 // ── Domain models ────────────────────────────────────────────────────────────
 
+export interface ImagenResponse {
+  id: number
+  url: string
+  tipo: string
+  entidadId: number | null
+  orden: number
+  nombreOriginal: string
+  tamanioBytes: number
+  fechaCreacion: string
+}
+
 export interface Administrador {
   id: number
   nombre: string
@@ -41,6 +52,7 @@ export interface Producto {
   disponible: boolean
   categoriaId: number
   extras: ProductoExtra[]
+  imagenes?: { url: string; orden: number }[]
 }
 
 export type EstadoPedido = 'Pendiente' | 'EnPreparacion' | 'Listo' | 'Entregado' | 'Cancelado'
@@ -125,6 +137,7 @@ export interface LocalPublico {
   telefono: string
   linkWhatsapp: string | null
   logoUrl: string | null
+  logoImagenUrl: string | null
   direccion: string
   esActivo: boolean
   aliasTransferencia: string | null
