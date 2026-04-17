@@ -14,10 +14,11 @@ function formatComentarioFecha(iso: string) {
     ', ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
 
-const ESTADOS: EstadoPedido[] = ['Pendiente', 'EnPreparacion', 'Listo', 'Entregado', 'Cancelado']
+const ESTADOS: EstadoPedido[] = ['Pendiente', 'Confirmado', 'EnPreparacion', 'Listo', 'Entregado', 'Cancelado']
 
 const ESTADO_LABELS: Record<EstadoPedido, string> = {
   Pendiente:     'Pendiente',
+  Confirmado:    'Confirmado',
   EnPreparacion: 'En preparación',
   Listo:         'Listo',
   Entregado:     'Entregado',
@@ -64,22 +65,42 @@ export default function PedidoDetallePage() {
   const [loadingTicket, setLoadingTicket] = useState(false)
 
   const handleOpenComanda = async () => {
-    if (!id) return
+    if (!id || !pedido) return
     setLoadingComanda(true)
     try {
       const datos = await getComanda(Number(id))
-      setModal({ tipo: 'comanda', datos })
+      setModal({
+        tipo: 'comanda',
+        datos: {
+          ...datos,
+          fecha: datos.fecha || pedido.fecha,
+          items: datos.items.map((item, i) => ({
+            ...item,
+            varianteDescripcion: pedido.detalles[i]?.varianteDescripcion,
+          })),
+        },
+      })
     } finally {
       setLoadingComanda(false)
     }
   }
 
   const handleOpenTicket = async () => {
-    if (!id) return
+    if (!id || !pedido) return
     setLoadingTicket(true)
     try {
       const datos = await getTicket(Number(id))
-      setModal({ tipo: 'ticket', datos })
+      setModal({
+        tipo: 'ticket',
+        datos: {
+          ...datos,
+          fecha: datos.fecha || pedido.fecha,
+          items: datos.items.map((item, i) => ({
+            ...item,
+            varianteDescripcion: pedido.detalles[i]?.varianteDescripcion,
+          })),
+        },
+      })
     } finally {
       setLoadingTicket(false)
     }
@@ -294,6 +315,9 @@ export default function PedidoDetallePage() {
                   <span className="font-medium">
                     {d.cantidad}× {d.nombreProducto ?? `Producto #${d.productoId}`}
                   </span>
+                  {d.varianteDescripcion && (
+                    <p className="text-xs mt-0.5" style={{ color: '#666' }}>{d.varianteDescripcion}</p>
+                  )}
                   {(d.extras ?? []).length > 0 && (
                     <div className="mt-1">
                       {(d.extras ?? []).map((e, i) => (

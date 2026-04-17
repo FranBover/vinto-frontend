@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
 import { useCartStore } from '../../store/cartStore'
-import type { Producto, ProductoExtra } from '../../types'
+import type { Producto, ProductoExtra, TipoVarianteMenu, VarianteMenu } from '../../types'
 import { BASE_URL } from '../../config'
 
 function resolveImages(producto: Producto): string[] {
@@ -14,6 +14,43 @@ function resolveImages(producto: Producto): string[] {
   }
   if (producto.imagenUrl) return [producto.imagenUrl]
   return []
+}
+
+function isVarianteAvailable(v: VarianteMenu): boolean {
+  return v.disponible && (v.stock === null || v.stock > 0)
+}
+
+function resolveVarianteActiva(
+  tiposSorted: TipoVarianteMenu[],
+  variantes: VarianteMenu[],
+  selected: Record<number, number>,
+): VarianteMenu | null {
+  const tipo1 = tiposSorted[0]
+  const tipo2 = tiposSorted[1]
+  if (!tipo1) return null
+  const op1 = selected[tipo1.id]
+  if (!op1) return null
+  if (tipo2) {
+    const op2 = selected[tipo2.id]
+    if (!op2) return null
+    return variantes.find(v => v.opcion1Id === op1 && v.opcion2Id === op2) ?? null
+  }
+  return variantes.find(v => v.opcion1Id === op1) ?? null
+}
+
+function isOpcionAvailable(
+  opcionId: number,
+  tipoIndex: number,
+  variantes: VarianteMenu[],
+  tipo1Selection: number | undefined,
+): boolean {
+  if (tipoIndex === 0) {
+    return variantes.some(v => v.opcion1Id === opcionId && isVarianteAvailable(v))
+  }
+  if (tipo1Selection !== undefined) {
+    return variantes.some(v => v.opcion1Id === tipo1Selection && v.opcion2Id === opcionId && isVarianteAvailable(v))
+  }
+  return variantes.some(v => v.opcion2Id === opcionId && isVarianteAvailable(v))
 }
 
 export default function ExtrasPage() {
@@ -30,6 +67,7 @@ export default function ExtrasPage() {
   const [cantidad, setCantidad] = useState(1)
   const [imgIndex, setImgIndex] = useState(0)
   const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({})
+  const [selectedOpciones, setSelectedOpciones] = useState<Record<number, number>>({})
 
   useEffect(() => {
     if (slug) fetchMenu(slug)
@@ -52,6 +90,37 @@ export default function ExtrasPage() {
   const activeIndex = Math.min(imgIndex, Math.max(0, images.length - 1))
   const canNavigate = images.length > 1
 
+  // ── Variants ──────────────────────────────────────────────────────────────
+  const tieneVariantes = producto.tieneVariantes === true
+  const tiposVariante = producto.tiposVariante ?? []
+  const variantesMenu = producto.variantes ?? []
+  const tiposSorted = [...tiposVariante].sort((a, b) => a.orden - b.orden)
+  const tipo1 = tiposSorted[0]
+
+  const varianteActiva = tieneVariantes
+    ? resolveVarianteActiva(tiposSorted, variantesMenu, selectedOpciones)
+    : null
+
+  const variantesDisponibles = variantesMenu.filter(isVarianteAvailable)
+  const minPrecioVariantes = variantesDisponibles.length > 0
+    ? Math.min(...variantesDisponibles.map(v => v.precio))
+    : 0
+
+  function handleSelectOpcion(tipoId: number, opcionId: number, tipoIndex: number) {
+    setSelectedOpciones(prev => {
+      if (prev[tipoId] === opcionId) {
+        const next = { ...prev }
+        delete next[tipoId]
+        if (tipoIndex === 0 && tiposSorted[1]) delete next[tiposSorted[1].id]
+        return next
+      }
+      const next = { ...prev, [tipoId]: opcionId }
+      if (tipoIndex === 0 && tiposSorted[1]) delete next[tiposSorted[1].id]
+      return next
+    })
+  }
+
+  // ── Price ──────────────────────────────────────────────────────────────────
   const toggleExtra = (extra: ProductoExtra) => {
     setSelectedExtras(prev =>
       prev.some(e => e.id === extra.id)
@@ -61,11 +130,34 @@ export default function ExtrasPage() {
   }
 
   const extrasTotal = selectedExtras.reduce((s, e) => s + e.precioAdicional, 0)
-  const precioUnitario = producto.precio + extrasTotal
+  const basePrecio = tieneVariantes
+    ? (varianteActiva?.precio ?? 0)
+    : (producto.precio ?? 0)
+  const precioUnitario = basePrecio + extrasTotal
   const totalItem = precioUnitario * cantidad
 
+  const precioDisplay = tieneVariantes
+    ? varianteActiva
+      ? `$${varianteActiva.precio.toLocaleString('es-AR')}`
+      : variantesDisponibles.length > 0
+        ? `Desde $${minPrecioVariantes.toLocaleString('es-AR')}`
+        : 'Agotado'
+    : `$${(producto.precio ?? 0).toLocaleString('es-AR')}`
+
+  const canAdd = isOpen && (!tieneVariantes || (varianteActiva !== null && isVarianteAvailable(varianteActiva)))
+
   const handleAgregar = () => {
-    agregarItem(producto, selectedExtras, cantidad)
+    if (!canAdd) return
+    const precioFinal = tieneVariantes && varianteActiva
+      ? varianteActiva.precio
+      : (producto.precio ?? 0)
+    agregarItem(
+      { ...producto, precio: precioFinal },
+      selectedExtras,
+      cantidad,
+      varianteActiva?.id,
+      varianteActiva?.descripcion,
+    )
     navigate(`/${slug}/productos/${categoriaId}`)
   }
 
@@ -112,7 +204,6 @@ export default function ExtrasPage() {
                 />
               )}
 
-              {/* Arrows */}
               {canNavigate && (
                 <>
                   <button
@@ -134,7 +225,6 @@ export default function ExtrasPage() {
                 </>
               )}
 
-              {/* Dots */}
               {canNavigate && (
                 <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
                   {images.map((_, i) => (
@@ -152,7 +242,6 @@ export default function ExtrasPage() {
           )}
         </div>
 
-        {/* Responsive height override for desktop */}
         <style>{`@media (min-width: 768px) { .product-hero { height: 380px !important; } }`}</style>
 
         {/* Product info */}
@@ -163,10 +252,51 @@ export default function ExtrasPage() {
               {producto.descripcion}
             </p>
           )}
-          <p className="font-bold text-base mt-3">
-            ${producto.precio.toLocaleString('es-AR')}
-          </p>
+          <p className="font-bold text-base mt-3">{precioDisplay}</p>
         </div>
+
+        {/* ── Variantes ──────────────────────────────────────────── */}
+        {tieneVariantes && tiposSorted.length > 0 && (
+          <>
+            {tiposSorted.map((tipo, tipoIndex) => {
+              const opcionesSorted = [...tipo.opciones].sort((a, b) => a.orden - b.orden)
+              const tipo1Selection = tipo1 ? selectedOpciones[tipo1.id] : undefined
+              return (
+                <div key={tipo.id} className="px-4 py-4 border-b border-[#e8e8e8]">
+                  <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-3">
+                    {tipo.nombre}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {opcionesSorted.map(opcion => {
+                      const available = isOpcionAvailable(opcion.id, tipoIndex, variantesMenu, tipo1Selection)
+                      const isSelected = selectedOpciones[tipo.id] === opcion.id
+                      return (
+                        <button
+                          key={opcion.id}
+                          type="button"
+                          disabled={!available}
+                          onClick={() => handleSelectOpcion(tipo.id, opcion.id, tipoIndex)}
+                          className={`px-3 py-1.5 text-sm font-medium transition-colors rounded-none ${
+                            !available
+                              ? 'bg-[#e0e0e0] text-[#999] cursor-not-allowed'
+                              : isSelected
+                                ? 'text-white'
+                                : 'bg-[#f0f0f0] text-[#1a1a1a]'
+                          }`}
+                          style={isSelected && available ? { backgroundColor: '#2d5a27' } : undefined}
+                        >
+                          {!available
+                            ? <s>{opcion.valor}</s>
+                            : opcion.valor}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </>
+        )}
 
         {/* Extras */}
         {producto.extras.length > 0 && (
@@ -228,17 +358,23 @@ export default function ExtrasPage() {
       {/* ── Agregar bar ────────────────────────────────────────── */}
       <div
         className="fixed bottom-0 left-0 right-0 z-20 text-white"
-        style={{ backgroundColor: isOpen ? '#2d5a27' : '#999' }}
+        style={{ backgroundColor: canAdd ? '#2d5a27' : '#999' }}
       >
         <button
-          onClick={isOpen ? handleAgregar : undefined}
-          disabled={!isOpen}
+          onClick={handleAgregar}
+          disabled={!canAdd}
           className="w-full flex items-center justify-between px-4 py-4 disabled:cursor-not-allowed"
         >
           <span className="font-bold text-sm">
-            {isOpen ? 'Agregar al pedido' : 'Local cerrado'}
+            {!isOpen
+              ? 'Local cerrado'
+              : tieneVariantes && !varianteActiva
+                ? 'Seleccioná una variante'
+                : 'Agregar al pedido'}
           </span>
-          <span className="font-bold">${totalItem.toLocaleString('es-AR')}</span>
+          {canAdd && (
+            <span className="font-bold">${totalItem.toLocaleString('es-AR')}</span>
+          )}
         </button>
       </div>
     </div>

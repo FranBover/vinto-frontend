@@ -4,8 +4,15 @@ type Props =
   | { tipo: 'comanda'; datos: ComandaResponseDTO; onClose: () => void }
   | { tipo: 'ticket';  datos: TicketResponseDTO;  onClose: () => void }
 
-function fmt(iso: string) {
-  const d = new Date(iso)
+function fmt(iso: string): string {
+  if (!iso) return '—'
+  let d = new Date(iso)
+  // Fallback: handle dd/MM/yyyy HH:mm:ss (locale-formatted .NET dates)
+  if (isNaN(d.getTime())) {
+    const m = iso.match(/^(\d{2})\/(\d{2})\/(\d{4})[,\s]+(\d{2}):(\d{2})/)
+    if (m) d = new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:00`)
+  }
+  if (isNaN(d.getTime())) return iso
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
     ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
@@ -31,6 +38,9 @@ function ComandaContent({ d }: { d: ComandaResponseDTO }) {
       {d.items.map((item, i) => (
         <div key={i} style={{ marginBottom: 6 }}>
           <p style={{ fontWeight: 600 }}>{item.cantidad}x {item.nombreProducto}</p>
+          {item.varianteDescripcion && (
+            <p style={{ paddingLeft: 12, fontSize: 12 }}>{item.varianteDescripcion}</p>
+          )}
           {item.extras.map((e, j) => (
             <p key={j} style={{ paddingLeft: 12 }}>+ {e}</p>
           ))}
@@ -62,6 +72,9 @@ function TicketContent({ d }: { d: TicketResponseDTO }) {
             <span style={{ fontWeight: 600 }}>{item.cantidad}x {item.nombreProducto}</span>
             <span>{money(item.subtotal)}</span>
           </div>
+          {item.varianteDescripcion && (
+            <p style={{ paddingLeft: 12, fontSize: 12, margin: 0 }}>{item.varianteDescripcion}</p>
+          )}
           {item.extras.map((e, j) => (
             <div key={j} style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 12, fontSize: 12 }}>
               <span>+ {e.nombre}</span>

@@ -5,6 +5,16 @@ import CartBar from '../../components/client/CartBar'
 import { BASE_URL } from '../../config'
 import type { Producto } from '../../types'
 
+function getPrecioText(producto: Producto): string {
+  if (producto.tieneVariantes && producto.variantes?.length) {
+    const disponibles = producto.variantes.filter(v => v.disponible && (v.stock === null || v.stock > 0))
+    if (disponibles.length === 0) return 'Agotado'
+    const min = Math.min(...disponibles.map(v => v.precio))
+    return `Desde $${min.toLocaleString('es-AR')}`
+  }
+  return `$${(producto.precio ?? 0).toLocaleString('es-AR')}`
+}
+
 function resolveImageUrl(producto: Producto): string | null {
   if (producto.imagenes && producto.imagenes.length > 0) {
     return BASE_URL + producto.imagenes[0].url
@@ -87,7 +97,7 @@ export default function ProductosPage() {
                       </p>
                     )}
                     <p className="font-bold text-sm mt-2">
-                      ${producto.precio.toLocaleString('es-AR')}
+                      {getPrecioText(producto)}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">

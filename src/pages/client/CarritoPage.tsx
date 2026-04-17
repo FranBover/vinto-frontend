@@ -49,9 +49,9 @@ export default function CarritoPage() {
       <ul>
         {items.map(item => {
           const extrasIds = item.extras.map(e => e.id)
-          const key = `${item.producto.id}-${[...extrasIds].sort().join(',')}`
+          const key = `${item.producto.id}-${[...extrasIds].sort().join(',')}${item.varianteId != null ? `:${item.varianteId}` : ''}`
           const extrasTotal = item.extras.reduce((s, e) => s + e.precioAdicional, 0)
-          const precioUnitario = item.producto.precio + extrasTotal
+          const precioUnitario = (item.producto.precio ?? 0) + extrasTotal
 
           return (
             <li key={key} className="border-b border-[#e8e8e8] px-4 py-5">
@@ -60,9 +60,12 @@ export default function CarritoPage() {
                   <p className="font-bold text-[15px] leading-tight">
                     {item.producto.nombre}
                   </p>
-                  {item.extras.length > 0 && (
+                  {(item.varianteDescripcion || item.extras.length > 0) && (
                     <p className="text-xs text-[#888] mt-0.5">
-                      + {item.extras.map(e => e.nombre).join(', ')}
+                      {[
+                        item.varianteDescripcion,
+                        item.extras.length > 0 ? item.extras.map(e => e.nombre).join(', ') : null,
+                      ].filter(Boolean).join(' · ')}
                     </p>
                   )}
                   <p className="text-xs text-[#999] mt-1">
@@ -70,7 +73,7 @@ export default function CarritoPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => quitarItem(item.producto.id, extrasIds)}
+                  onClick={() => quitarItem(item.producto.id, extrasIds, item.varianteId)}
                   aria-label="Eliminar"
                   className="text-[#ccc] text-sm hover:text-[#1a1a1a] transition-colors shrink-0 mt-0.5"
                 >
@@ -81,7 +84,7 @@ export default function CarritoPage() {
               {/* Quantity + subtotal */}
               <div className="flex items-center mt-4 gap-0">
                 <button
-                  onClick={() => cambiarCantidad(item.producto.id, extrasIds, item.cantidad - 1)}
+                  onClick={() => cambiarCantidad(item.producto.id, extrasIds, item.cantidad - 1, item.varianteId)}
                   className="w-8 h-8 bg-[#f0f0f0] font-bold text-base flex items-center justify-center rounded-none"
                 >
                   −
@@ -90,7 +93,7 @@ export default function CarritoPage() {
                   {item.cantidad}
                 </span>
                 <button
-                  onClick={() => cambiarCantidad(item.producto.id, extrasIds, item.cantidad + 1)}
+                  onClick={() => cambiarCantidad(item.producto.id, extrasIds, item.cantidad + 1, item.varianteId)}
                   className="w-8 h-8 bg-[#f0f0f0] font-bold text-base flex items-center justify-center rounded-none"
                 >
                   +

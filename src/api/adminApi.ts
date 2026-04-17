@@ -6,6 +6,9 @@ import type {
   Categoria,
   ProductoExtra,
   ImagenResponse,
+  TipoVariante,
+  OpcionVariante,
+  Variante,
 } from '../types'
 
 export type { ImagenResponse }
@@ -151,6 +154,7 @@ export const updateLocalData = async (id: number, payload: {
 export interface ComandaItem {
   cantidad: number
   nombreProducto: string
+  varianteDescripcion?: string
   extras: string[]
 }
 
@@ -167,6 +171,7 @@ export interface ComandaResponseDTO {
 export interface TicketItem {
   cantidad: number
   nombreProducto: string
+  varianteDescripcion?: string
   precioUnitario: number
   subtotal: number
   extras: { nombre: string; precioAdicional: number }[]
@@ -249,6 +254,54 @@ export const uploadImagen = async (
 
 export const deleteImagen = async (imagenId: number): Promise<void> => {
   await apiClient.delete(`/Imagenes/${imagenId}`)
+}
+
+// ── Variantes ─────────────────────────────────────────────────────────────────
+
+export const getTiposVariante = async (productoId: number): Promise<Omit<TipoVariante, 'opciones'>[]> => {
+  const { data } = await apiClient.get<Omit<TipoVariante, 'opciones'>[]>(`/Productos/${productoId}/tipos-variante`)
+  return data
+}
+
+export const createTipoVariante = async (productoId: number, dto: { nombre: string; orden: number }): Promise<void> => {
+  await apiClient.post(`/Productos/${productoId}/tipos-variante`, dto)
+}
+
+export const deleteTipoVariante = async (productoId: number, id: number): Promise<void> => {
+  await apiClient.delete(`/Productos/${productoId}/tipos-variante/${id}`)
+}
+
+export const getOpcionesVariante = async (tipoId: number): Promise<OpcionVariante[]> => {
+  const { data } = await apiClient.get<OpcionVariante[]>(`/tipos-variante/${tipoId}/opciones`)
+  return data
+}
+
+export const createOpcionVariante = async (tipoId: number, dto: { valor: string; orden: number }): Promise<void> => {
+  await apiClient.post(`/tipos-variante/${tipoId}/opciones`, dto)
+}
+
+export const deleteOpcionVariante = async (tipoId: number, id: number): Promise<void> => {
+  await apiClient.delete(`/tipos-variante/${tipoId}/opciones/${id}`)
+}
+
+export const getVariantes = async (productoId: number): Promise<Variante[]> => {
+  const { data } = await apiClient.get<Variante[]>(`/Productos/${productoId}/variantes`)
+  return data
+}
+
+export const generarVariantes = async (productoId: number): Promise<void> => {
+  await apiClient.post(`/Productos/${productoId}/variantes/generar`)
+}
+
+export const deleteAllVariantes = async (productoId: number): Promise<void> => {
+  await apiClient.delete(`/Productos/${productoId}/variantes`)
+}
+
+export const updateVariante = async (
+  varianteId: number,
+  dto: { precio: number; stock: number | null; disponible: boolean; sku: string | null },
+): Promise<void> => {
+  await apiClient.put(`/Variantes/${varianteId}`, dto)
 }
 
 // ── Reportes ──────────────────────────────────────────────────────────────────

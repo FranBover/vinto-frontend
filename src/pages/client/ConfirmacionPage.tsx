@@ -58,8 +58,9 @@ function buildWhatsAppText(state: LocationState): string {
   lines.push('')
   lines.push('*Productos*')
   for (const item of items) {
-    const precioUnitario = item.producto.precio + item.extras.reduce((s, e) => s + e.precioAdicional, 0)
-    lines.push(`${item.cantidad}x ${item.producto.nombre}: ${pesos(precioUnitario * item.cantidad)}`)
+    const precioUnitario = (item.producto.precio ?? 0) + item.extras.reduce((s, e) => s + e.precioAdicional, 0)
+    const varianteLabel = item.varianteDescripcion ? ` (${item.varianteDescripcion})` : ''
+    lines.push(`${item.cantidad}x ${item.producto.nombre}${varianteLabel}: ${pesos(precioUnitario * item.cantidad)}`)
     for (const extra of item.extras) {
       lines.push(`  + ${extra.nombre}: ${pesos(extra.precioAdicional)}`)
     }

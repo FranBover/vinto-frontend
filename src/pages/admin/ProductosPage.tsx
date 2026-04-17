@@ -9,6 +9,7 @@ import type { ImagenResponse } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
 import type { Producto, Categoria, ProductoExtra } from '../../types'
 import ImageUploader from '../../components/admin/ImageUploader'
+import VariantesSection from '../../components/admin/VariantesSection'
 
 interface ProductoForm {
   nombre: string
@@ -39,6 +40,9 @@ export default function ProductosAdminPage() {
   const [editingProducto, setEditingProducto] = useState<Producto | null>(null)
   const [form, setForm] = useState<ProductoForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  // Key estable para VariantesSection — solo cambia al abrir/cerrar el drawer,
+  // nunca al guardar el producto, así el componente no se re-monta en cada save
+  const [variantesKey, setVariantesKey] = useState<number | null>(null)
 
   // Toggle disponibilidad
   const [togglingId, setTogglingId] = useState<number | null>(null)
@@ -73,6 +77,7 @@ export default function ProductosAdminPage() {
   }
 
   async function openEdit(p: Producto) {
+    setVariantesKey(p.id)
     setEditingProducto(p)
     setForm({
       nombre: p.nombre,
@@ -96,6 +101,7 @@ export default function ProductosAdminPage() {
   function closeDrawer() {
     setDrawerOpen(false)
     setEditingProducto(null)
+    setVariantesKey(null)
     setNewExtraNombre('')
     setNewExtraPrecio('')
     setImagenes([])
@@ -224,7 +230,7 @@ export default function ProductosAdminPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-[#666]">{categoriaNombre(p.categoriaId)}</td>
-                    <td className="px-4 py-3 font-bold">${p.precio.toLocaleString('es-AR')}</td>
+                    <td className="px-4 py-3 font-bold">${(p.precio ?? 0).toLocaleString('es-AR')}</td>
                     <td className="px-4 py-3">
                       <span
                         className="inline-block w-2 h-2 rounded-full"
@@ -375,6 +381,15 @@ export default function ProductosAdminPage() {
                 {saving ? 'Guardando…' : editingProducto ? 'Guardar cambios' : 'Crear producto'}
               </button>
             </form>
+
+            {/* Variantes — only shown when editing an existing product */}
+            {variantesKey !== null && editingProducto && (
+              <VariantesSection
+                key={variantesKey}
+                productoId={variantesKey}
+                tieneVariantes={editingProducto.tieneVariantes ?? false}
+              />
+            )}
 
             {/* Extras — only shown after product exists */}
             {editingProducto && (

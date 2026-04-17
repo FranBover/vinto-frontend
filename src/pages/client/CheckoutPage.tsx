@@ -93,6 +93,7 @@ export default function CheckoutPage() {
         productoId: item.producto.id,
         cantidad: item.cantidad,
         extrasSeleccionados: item.extras.map(e => e.id),
+        varianteProductoId: item.varianteId ?? null,
       })),
       ...(formaEntrega === 'Delivery' && {
         direccionCliente: direccion.trim(),
@@ -457,17 +458,20 @@ export default function CheckoutPage() {
                 (s, e) => s + e.precioAdicional,
                 0
               )
-              const precioUnitario = item.producto.precio + extrasTotal
+              const precioUnitario = (item.producto.precio ?? 0) + extrasTotal
               return (
                 <div
-                  key={`${item.producto.id}-${item.extras.map(e => e.id).join(',')}`}
+                  key={`${item.producto.id}-${item.extras.map(e => e.id).join(',')}${item.varianteId != null ? `:${item.varianteId}` : ''}`}
                   className="flex justify-between text-sm"
                 >
                   <span className="text-[#666]">
                     {item.cantidad}× {item.producto.nombre}
-                    {item.extras.length > 0 && (
+                    {(item.varianteDescripcion || item.extras.length > 0) && (
                       <span className="text-[#aaa]">
-                        {' '}(+ {item.extras.map(e => e.nombre).join(', ')})
+                        {' '}({[
+                          item.varianteDescripcion,
+                          item.extras.length > 0 ? item.extras.map(e => e.nombre).join(', ') : null,
+                        ].filter(Boolean).join(' · ')})
                       </span>
                     )}
                   </span>

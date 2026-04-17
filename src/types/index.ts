@@ -43,19 +43,77 @@ export interface ProductoExtra {
   productoId: number
 }
 
+export interface OpcionVarianteMenu {
+  id: number
+  valor: string
+  orden: number
+}
+
+export interface TipoVarianteMenu {
+  id: number
+  nombre: string
+  orden: number
+  opciones: OpcionVarianteMenu[]
+}
+
+export interface VarianteMenu {
+  id: number
+  precio: number
+  stock: number | null
+  disponible: boolean
+  opcion1Id: number
+  opcion2Id: number | null
+  descripcion: string
+}
+
 export interface Producto {
   id: number
   nombre: string
   descripcion: string
-  precio: number
+  precio: number | null
   imagenUrl: string
   disponible: boolean
   categoriaId: number
+  tieneVariantes?: boolean
+  tiposVariante?: TipoVarianteMenu[]
+  variantes?: VarianteMenu[]
   extras: ProductoExtra[]
   imagenes?: { url: string; orden: number }[]
 }
 
-export type EstadoPedido = 'Pendiente' | 'EnPreparacion' | 'Listo' | 'Entregado' | 'Cancelado'
+export interface OpcionVariante {
+  id: number
+  valor: string
+  orden: number
+  tipoVarianteId: number
+}
+
+export interface TipoVariante {
+  id: number
+  nombre: string
+  orden: number
+  productoId: number
+  opciones: OpcionVariante[]
+}
+
+export interface VarianteOpcionSeleccionada {
+  tipoVarianteNombre: string
+  opcionVarianteValor: string
+}
+
+export interface Variante {
+  id: number
+  productoId: number
+  precio: number
+  stock: number | null
+  disponible: boolean
+  sku: string | null
+  descripcion?: string
+  label?: string
+  opcionesSeleccionadas?: VarianteOpcionSeleccionada[]
+}
+
+export type EstadoPedido = 'Pendiente' | 'Confirmado' | 'EnPreparacion' | 'Listo' | 'Entregado' | 'Cancelado'
 export type FormaPago = 'Efectivo' | 'Transferencia' | 'Tarjeta'
 export type FormaEntrega = 'Local' | 'Delivery'
 
@@ -69,6 +127,7 @@ export interface DetallePedido {
   pedidoId: number
   productoId: number
   nombreProducto?: string
+  varianteDescripcion?: string
   cantidad: number
   precioUnitario: number
   extras: DetallePedidoExtra[]
@@ -110,6 +169,7 @@ export interface CrearDetalleDto {
   productoId: number
   cantidad: number
   extrasSeleccionados: number[]
+  varianteProductoId?: number | null
 }
 
 export interface CrearPedidoDto {
