@@ -44,6 +44,11 @@ export default function ProductosAdminPage() {
   // nunca al guardar el producto, así el componente no se re-monta en cada save
   const [variantesKey, setVariantesKey] = useState<number | null>(null)
 
+  // Filters
+  const [filterNombre, setFilterNombre] = useState('')
+  const [filterCategoriaId, setFilterCategoriaId] = useState('')
+  const [filterDisponible, setFilterDisponible] = useState('')
+
   // Toggle disponibilidad
   const [togglingId, setTogglingId] = useState<number | null>(null)
 
@@ -186,6 +191,14 @@ export default function ProductosAdminPage() {
   const categoriaNombre = (id: number) =>
     categorias.find(c => c.id === id)?.nombre ?? '—'
 
+  const productosFiltrados = productos.filter(p => {
+    if (filterNombre && !p.nombre.toLowerCase().includes(filterNombre.toLowerCase())) return false
+    if (filterCategoriaId && p.categoriaId !== Number(filterCategoriaId)) return false
+    if (filterDisponible === 'true' && !p.disponible) return false
+    if (filterDisponible === 'false' && p.disponible) return false
+    return true
+  })
+
   return (
     <AdminLayout
       title="Productos"
@@ -198,6 +211,36 @@ export default function ProductosAdminPage() {
         </button>
       }
     >
+      {!loading && (
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <input
+            type="text"
+            placeholder="Buscar producto..."
+            value={filterNombre}
+            onChange={e => setFilterNombre(e.target.value)}
+            className="flex-1 border border-[#d0d0d0] px-3 py-2 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white transition-colors"
+          />
+          <select
+            value={filterCategoriaId}
+            onChange={e => setFilterCategoriaId(e.target.value)}
+            className="w-full sm:w-48 border border-[#d0d0d0] px-3 py-2 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white transition-colors"
+          >
+            <option value="">Todas las categorías</option>
+            {categorias.map(c => (
+              <option key={c.id} value={c.id}>{c.nombre}</option>
+            ))}
+          </select>
+          <select
+            value={filterDisponible}
+            onChange={e => setFilterDisponible(e.target.value)}
+            className="w-full sm:w-44 border border-[#d0d0d0] px-3 py-2 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white transition-colors"
+          >
+            <option value="">Todos</option>
+            <option value="true">Disponibles</option>
+            <option value="false">No disponibles</option>
+          </select>
+        </div>
+      )}
       {loading ? (
         <p className="text-sm text-[#aaa] py-8 text-center">Cargando…</p>
       ) : (
@@ -213,12 +256,14 @@ export default function ProductosAdminPage() {
               </tr>
             </thead>
             <tbody>
-              {productos.length === 0 ? (
+              {productosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-12 text-[#aaa] text-sm">Sin productos.</td>
+                  <td colSpan={5} className="text-center py-12 text-[#aaa] text-sm">
+                    {productos.length === 0 ? 'Sin productos.' : 'Ningún producto coincide con los filtros.'}
+                  </td>
                 </tr>
               ) : (
-                productos.map(p => (
+                productosFiltrados.map(p => (
                   <tr
                     key={p.id}
                     className={`border-b border-[#e8e8e8] last:border-b-0 hover:bg-[#fafaf9] transition-colors${p.disponible ? '' : ' opacity-50'}`}
