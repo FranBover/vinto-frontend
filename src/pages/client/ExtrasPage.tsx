@@ -101,6 +101,14 @@ export default function ExtrasPage() {
     ? resolveVarianteActiva(tiposSorted, variantesMenu, selectedOpciones)
     : null
 
+  const maxCantidad = varianteActiva?.stock != null ? varianteActiva.stock : null
+
+  useEffect(() => {
+    if (maxCantidad != null && cantidad > maxCantidad) {
+      setCantidad(Math.max(1, maxCantidad))
+    }
+  }, [varianteActiva?.id])
+
   const variantesDisponibles = variantesMenu.filter(isVarianteAvailable)
   const minPrecioVariantes = variantesDisponibles.length > 0
     ? Math.min(...variantesDisponibles.map(v => v.precio))
@@ -253,6 +261,15 @@ export default function ExtrasPage() {
             </p>
           )}
           <p className="font-bold text-base mt-3">{precioDisplay}</p>
+          {tieneVariantes && varianteActiva && !isVarianteAvailable(varianteActiva) && (
+            <p className="text-sm font-bold mt-1" style={{ color: '#dc2626' }}>Agotado</p>
+          )}
+          {tieneVariantes && varianteActiva && isVarianteAvailable(varianteActiva) &&
+            varianteActiva.stock !== null && varianteActiva.stock <= 3 && (
+            <p className="text-xs mt-1" style={{ color: '#a16207' }}>
+              Últimas {varianteActiva.stock} unidades
+            </p>
+          )}
         </div>
 
         {/* ── Variantes ──────────────────────────────────────────── */}
@@ -346,8 +363,9 @@ export default function ExtrasPage() {
               {cantidad}
             </span>
             <button
-              onClick={() => setCantidad(q => q + 1)}
-              className="w-10 h-10 bg-[#f0f0f0] text-[#1a1a1a] font-bold text-lg flex items-center justify-center rounded-none"
+              onClick={() => setCantidad(q => maxCantidad != null ? Math.min(q + 1, maxCantidad) : q + 1)}
+              disabled={maxCantidad != null && cantidad >= maxCantidad}
+              className="w-10 h-10 bg-[#f0f0f0] text-[#1a1a1a] font-bold text-lg flex items-center justify-center rounded-none disabled:opacity-30"
             >
               +
             </button>
@@ -368,9 +386,11 @@ export default function ExtrasPage() {
           <span className="font-bold text-sm">
             {!isOpen
               ? 'Local cerrado'
-              : tieneVariantes && !varianteActiva
-                ? 'Seleccioná una variante'
-                : 'Agregar al pedido'}
+              : tieneVariantes && varianteActiva && !isVarianteAvailable(varianteActiva)
+                ? 'Agotado'
+                : tieneVariantes && !varianteActiva
+                  ? 'Seleccioná una variante'
+                  : 'Agregar al pedido'}
           </span>
           {canAdd && (
             <span className="font-bold">${totalItem.toLocaleString('es-AR')}</span>

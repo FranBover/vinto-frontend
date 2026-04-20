@@ -15,6 +15,7 @@ import AdminProductosPage from './pages/admin/ProductosPage'
 import CategoriasPage from './pages/admin/CategoriasPage'
 import ReportesPage from './pages/admin/ReportesPage'
 import MiLocalPage from './pages/admin/MiLocalPage'
+import StockPage from './pages/admin/StockPage'
 
 function ProtectedRoute() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/admin/productos" element={<AdminProductosPage />} />
           <Route path="/admin/categorias" element={<CategoriasPage />} />
           <Route path="/admin/reportes" element={<ReportesPage />} />
+          <Route path="/admin/stock" element={<StockPage />} />
           <Route path="/admin/mi-local" element={<MiLocalPage />} />
         </Route>
 

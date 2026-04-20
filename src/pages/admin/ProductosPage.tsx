@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/authStore'
 import type { Producto, Categoria, ProductoExtra } from '../../types'
 import ImageUploader from '../../components/admin/ImageUploader'
 import VariantesSection from '../../components/admin/VariantesSection'
+import StockSection from '../../components/admin/StockSection'
 
 interface ProductoForm {
   nombre: string
@@ -43,6 +44,7 @@ export default function ProductosAdminPage() {
   // Key estable para VariantesSection — solo cambia al abrir/cerrar el drawer,
   // nunca al guardar el producto, así el componente no se re-monta en cada save
   const [variantesKey, setVariantesKey] = useState<number | null>(null)
+  const [variantesActivas, setVariantesActivas] = useState(false)
 
   // Filters
   const [filterNombre, setFilterNombre] = useState('')
@@ -83,6 +85,7 @@ export default function ProductosAdminPage() {
 
   async function openEdit(p: Producto) {
     setVariantesKey(p.id)
+    setVariantesActivas(p.tieneVariantes ?? false)
     setEditingProducto(p)
     setForm({
       nombre: p.nombre,
@@ -107,6 +110,7 @@ export default function ProductosAdminPage() {
     setDrawerOpen(false)
     setEditingProducto(null)
     setVariantesKey(null)
+    setVariantesActivas(false)
     setNewExtraNombre('')
     setNewExtraPrecio('')
     setImagenes([])
@@ -433,7 +437,13 @@ export default function ProductosAdminPage() {
                 key={variantesKey}
                 productoId={variantesKey}
                 tieneVariantes={editingProducto.tieneVariantes ?? false}
+                onToggleChange={setVariantesActivas}
               />
+            )}
+
+            {/* Stock — only for products without variants */}
+            {editingProducto && !variantesActivas && (
+              <StockSection productoId={editingProducto.id} />
             )}
 
             {/* Extras — only shown after product exists */}

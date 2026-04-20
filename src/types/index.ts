@@ -189,6 +189,17 @@ export interface UpdateEstadoDto {
   estado: EstadoPedido
 }
 
+// ── Stock ─────────────────────────────────────────────────────────────────────
+
+export interface StockAlertaDTO {
+  productoId: number
+  nombreProducto: string
+  varianteId: number | null
+  varianteDescripcion: string | null
+  stockActual: number
+  tipo: 'agotado' | 'bajo'
+}
+
 // ── Menu público ──────────────────────────────────────────────────────────────
 
 export interface LocalPublico {

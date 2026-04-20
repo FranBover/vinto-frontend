@@ -3,10 +3,57 @@ import {
   getTiposVariante, createTipoVariante, deleteTipoVariante,
   getOpcionesVariante, createOpcionVariante, deleteOpcionVariante,
   getVariantes, generarVariantes, updateVariante, deleteAllVariantes,
+  getStock,
 } from '../../api/adminApi'
+import type { MovimientoStock } from '../../api/adminApi'
 import type { TipoVariante, Variante } from '../../types'
 
 const labelCls = 'block text-[10px] font-bold text-[#aaa] uppercase tracking-widest'
+
+function formatFecha(fechaStr: string): string {
+  const d = new Date(fechaStr)
+  return d.toLocaleString('es-AR', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+function MovimientosTable({ movimientos }: { movimientos: MovimientoStock[] }) {
+  return (
+    <div>
+      <p className={labelCls + ' mb-2'}>Últimos movimientos</p>
+      <div className="border border-[#e8e8e8] overflow-hidden">
+        <div className="overflow-y-auto" style={{ maxHeight: 140 }}>
+          <table className="w-full text-[11px]">
+            <thead className="sticky top-0 bg-[#f5f5f5]">
+              <tr className="border-b border-[#e8e8e8]">
+                <th className="text-left px-2 py-2 text-[#aaa] font-bold whitespace-nowrap">Fecha</th>
+                <th className="text-left px-2 py-2 text-[#aaa] font-bold">Tipo</th>
+                <th className="text-right px-2 py-2 text-[#aaa] font-bold">Cant.</th>
+                <th className="text-left px-2 py-2 text-[#aaa] font-bold whitespace-nowrap">Ant → Nuevo</th>
+                <th className="text-left px-2 py-2 text-[#aaa] font-bold">Motivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {movimientos.map((m, i) => (
+                <tr key={i} className="border-b border-[#e8e8e8] last:border-b-0">
+                  <td className="px-2 py-1.5 whitespace-nowrap text-[#666]">{formatFecha(m.fecha)}</td>
+                  <td className="px-2 py-1.5 text-[#1a1a1a]">{m.tipo}</td>
+                  <td className="px-2 py-1.5 text-right font-medium">{m.cantidad}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap text-[#666]">
+                    {m.stockAnterior} → {m.stockNuevo}
+                  </td>
+                  <td className="px-2 py-1.5 text-[#aaa]">{m.motivo ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const smallInputCls =
   'flex-1 border border-[#d0d0d0] px-3 py-2 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white transition-colors'
 
@@ -19,6 +66,7 @@ interface FilaEdit {
 interface Props {
   productoId: number
   tieneVariantes: boolean
+  onToggleChange?: (value: boolean) => void
 }
 
 function getVarianteLabel(v: Variante): string {
@@ -29,7 +77,7 @@ function getVarianteLabel(v: Variante): string {
   return `Variante #${v.id}`
 }
 
-export default function VariantesSection({ productoId, tieneVariantes }: Props) {
+export default function VariantesSection({ productoId, tieneVariantes, onToggleChange }: Props) {
   const [toggleOn, setToggleOn] = useState(() => tieneVariantes ?? false)
   const [tipos, setTipos] = useState<TipoVariante[]>([])
   const [loading, setLoading] = useState(false)
@@ -55,6 +103,8 @@ export default function VariantesSection({ productoId, tieneVariantes }: Props) 
   const [savingTodas, setSavingTodas] = useState(false)
   const [savedTodas, setSavedTodas] = useState(false)
   const [errorGuardar, setErrorGuardar] = useState<string | null>(null)
+
+  const [movimientos, setMovimientos] = useState<MovimientoStock[]>([])
 
   // fetchTipos y fetchVariantes se usan en los handlers de agregar/eliminar ejes y opciones
   const fetchTipos = useCallback(async () => {
@@ -145,11 +195,19 @@ export default function VariantesSection({ productoId, tieneVariantes }: Props) 
       .finally(() => { setLoadingVariantes(false) })
   }, [toggleOn, productoId])
 
+  useEffect(() => {
+    if (!toggleOn || variantes.length === 0) return
+    void getStock(productoId)
+      .then(data => setMovimientos(data.ultimos_movimientos ?? []))
+      .catch(() => {})
+  }, [toggleOn, variantes.length, productoId])
+
   function handleToggle() {
     if (toggleOn) {
       setShowConfirmDisable(true)
     } else {
       setToggleOn(true)
+      onToggleChange?.(true)
     }
   }
 
@@ -162,6 +220,7 @@ export default function VariantesSection({ productoId, tieneVariantes }: Props) 
       setVariantes([])
       setFilaEdits({})
       setToggleOn(false)
+      onToggleChange?.(false)
       setShowConfirmDisable(false)
       setShowAddTipoForm(false)
       setNewTipoNombre('')
@@ -616,6 +675,13 @@ export default function VariantesSection({ productoId, tieneVariantes }: Props) 
                       <p className="text-xs text-red-500">{errorGuardar}</p>
                     )}
                   </div>
+
+                  {/* Historial de movimientos */}
+                  {movimientos.length > 0 && (
+                    <div className="mt-4">
+                      <MovimientosTable movimientos={movimientos} />
+                    </div>
+                  )}
                 </>
               )}
             </div>

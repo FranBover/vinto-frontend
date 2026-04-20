@@ -9,6 +9,7 @@ import type {
   TipoVariante,
   OpcionVariante,
   Variante,
+  StockAlertaDTO,
 } from '../types'
 
 export type { ImagenResponse }
@@ -302,6 +303,46 @@ export const updateVariante = async (
   dto: { precio: number; stock: number | null; disponible: boolean; sku: string | null },
 ): Promise<void> => {
   await apiClient.put(`/Variantes/${varianteId}`, dto)
+}
+
+// ── Stock ─────────────────────────────────────────────────────────────────────
+
+export interface MovimientoStock {
+  fecha: string
+  tipo: string
+  cantidad: number
+  stockAnterior: number
+  stockNuevo: number
+  motivo: string | null
+}
+
+export interface StockResponse {
+  stockProducto: number | null
+  ultimos_movimientos: MovimientoStock[]
+}
+
+export const getAlertas = async (): Promise<StockAlertaDTO[]> => {
+  const { data } = await apiClient.get<StockAlertaDTO[]>('/Stock/alertas')
+  return data
+}
+
+export const getStock = async (productoId: number): Promise<StockResponse> => {
+  const { data } = await apiClient.get<StockResponse>(`/Productos/${productoId}/stock`)
+  return data
+}
+
+export const ajustarStock = async (
+  productoId: number,
+  body: { varianteId: number | null; nuevoStock: number; motivo: string },
+): Promise<void> => {
+  await apiClient.post(`/Productos/${productoId}/stock/ajustar`, body)
+}
+
+export const agregarStock = async (
+  productoId: number,
+  body: { varianteId: number | null; cantidad: number; motivo: string },
+): Promise<void> => {
+  await apiClient.post(`/Productos/${productoId}/stock/agregar`, body)
 }
 
 // ── Reportes ──────────────────────────────────────────────────────────────────
