@@ -84,6 +84,26 @@ function TicketContent({ d }: { d: TicketResponseDTO }) {
         </div>
       ))}
       <p style={{ margin: '10px 0', letterSpacing: 1 }}>{SEP}</p>
+      {((d.montoDescuentoProductos ?? 0) > 0 || (d.montoDescuentoCupon ?? 0) > 0) && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Subtotal sin descuentos</span>
+            <span>{money(d.subtotalSinDescuentos ?? 0)}</span>
+          </div>
+          {(d.montoDescuentoProductos ?? 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Desc. productos</span>
+              <span>-{money(d.montoDescuentoProductos ?? 0)}</span>
+            </div>
+          )}
+          {(d.montoDescuentoCupon ?? 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Cupón {d.codigoCupon}</span>
+              <span>-{money(d.montoDescuentoCupon ?? 0)}</span>
+            </div>
+          )}
+        </>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span>Subtotal</span><span>{money(d.subtotal)}</span>
       </div>

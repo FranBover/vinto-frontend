@@ -4,20 +4,11 @@ import AdminLayout from '../../components/admin/AdminLayout'
 import { getPedidos } from '../../api/adminApi'
 import type { PedidosFiltros } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
-import { usePedidosHub } from '../../hooks/usePedidosHub'
-import NuevoPedidoToast from '../../components/NuevoPedidoToast'
+import { useNotificationsStore } from '../../store/notificationsStore'
 import type { Pedido, FormaPago, FormaEntrega } from '../../types'
 
 const FILTROS_VACIOS: PedidosFiltros = {
   estado: '', desde: '', hasta: '', formaPago: '', formaEntrega: '',
-}
-
-interface NuevoPedidoPayload {
-  pedidoId: number
-  codigoSeguimiento: string
-  nombreCliente: string
-  total: number
-  fechaCreacion: string
 }
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
@@ -61,9 +52,11 @@ export default function PedidosPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [nuevoPedido, setNuevoPedido] = useState<NuevoPedidoPayload | null>(null)
   const [draftFiltros, setDraftFiltros] = useState<PedidosFiltros>(FILTROS_VACIOS)
   const [activeFiltros, setActiveFiltros] = useState<PedidosFiltros>(FILTROS_VACIOS)
+
+  const ultimoNuevoPedido = useNotificationsStore(s => s.ultimoNuevoPedido)
+  const ultimoPagoConfirmado = useNotificationsStore(s => s.ultimoPagoConfirmado)
 
   const fetchPedidos = useCallback(() => {
     if (!adminId) return
@@ -79,12 +72,15 @@ export default function PedidosPage() {
     fetchPedidos()
   }, [fetchPedidos])
 
-  const handleNuevoPedido = useCallback((pedido: NuevoPedidoPayload) => {
-    setNuevoPedido(pedido)
-    fetchPedidos()
-  }, [fetchPedidos])
+  useEffect(() => {
+    if (ultimoNuevoPedido) fetchPedidos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ultimoNuevoPedido])
 
-  usePedidosHub({ adminId, onNuevoPedido: handleNuevoPedido })
+  useEffect(() => {
+    if (ultimoPagoConfirmado) fetchPedidos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ultimoPagoConfirmado])
 
   const inputStyle: React.CSSProperties = {
     border: '1px solid #d0d0d0',
@@ -248,12 +244,6 @@ export default function PedidosPage() {
             </tbody>
           </table>
         </div>
-      )}
-      {nuevoPedido && (
-        <NuevoPedidoToast
-          pedido={nuevoPedido}
-          onClose={() => setNuevoPedido(null)}
-        />
       )}
     </AdminLayout>
   )

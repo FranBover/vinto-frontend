@@ -51,7 +51,7 @@ export default function CarritoPage() {
           const extrasIds = item.extras.map(e => e.id)
           const key = `${item.producto.id}-${[...extrasIds].sort().join(',')}${item.varianteId != null ? `:${item.varianteId}` : ''}`
           const extrasTotal = item.extras.reduce((s, e) => s + e.precioAdicional, 0)
-          const precioUnitario = (item.producto.precio ?? 0) + extrasTotal
+          const precioUnitario = (item.producto.precioConDescuento ?? item.producto.precio ?? 0) + extrasTotal
 
           return (
             <li key={key} className="border-b border-[#e8e8e8] px-4 py-5">

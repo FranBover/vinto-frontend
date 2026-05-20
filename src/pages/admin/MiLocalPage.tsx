@@ -5,6 +5,7 @@ import type { ImagenResponse } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
 import type { Administrador } from '../../types'
 import ImageUploader from '../../components/admin/ImageUploader'
+import SeccionMercadoPago from '../../components/admin/SeccionMercadoPago'
 
 const inputCls =
   'w-full border border-[#d0d0d0] px-3 py-2.5 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white transition-colors'
@@ -286,6 +287,9 @@ export default function MiLocalPage() {
               </p>
             </div>
           </div>
+
+          {/* Local "completo" = tiene nombre, dirección y teléfono cargados */}
+          <SeccionMercadoPago localCompleto={!!(nombreLocal.trim() && direccion.trim() && telefono.trim())} />
 
           {admin && (
             <div className="text-xs text-[#aaa]">

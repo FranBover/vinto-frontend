@@ -10,6 +10,9 @@ import type {
   OpcionVariante,
   Variante,
   StockAlertaDTO,
+  EstadoMercadoPagoResponse,
+  OAuthUrlResponse,
+  MercadoPagoDiagnosticoResponse,
 } from '../types'
 
 export type { ImagenResponse }
@@ -190,6 +193,10 @@ export interface TicketResponseDTO {
   referenciaDireccion: string | null
   formaPago: string
   items: TicketItem[]
+  subtotalSinDescuentos?: number
+  montoDescuentoProductos?: number
+  montoDescuentoCupon?: number
+  codigoCupon?: string
   subtotal: number
   costoEnvio: number
   total: number
@@ -345,6 +352,116 @@ export const agregarStock = async (
   await apiClient.post(`/Productos/${productoId}/stock/agregar`, body)
 }
 
+// ── Descuentos ────────────────────────────────────────────────────────────────
+
+export interface DescuentoResponseDTO {
+  id: number
+  nombre: string
+  tipo: 'Porcentaje' | 'MontoFijo'
+  valor: number
+  productoId?: number
+  productoNombre?: string
+  categoriaId?: number
+  categoriaNombre?: string
+  aplicaAPedidoCompleto: boolean
+  fechaInicio?: string
+  fechaFin?: string
+  activo: boolean
+  fechaCreacion: string
+}
+
+export interface DescuentoCreateDTO {
+  nombre: string
+  tipo: 'Porcentaje' | 'MontoFijo'
+  valor: number
+  productoId?: number
+  categoriaId?: number
+  aplicaAPedidoCompleto: boolean
+  fechaInicio?: string
+  fechaFin?: string
+}
+
+export interface DescuentoUpdateDTO extends DescuentoCreateDTO {
+  activo: boolean
+}
+
+export const getDescuentos = async (activo?: boolean): Promise<DescuentoResponseDTO[]> => {
+  const params = activo !== undefined ? `?activo=${activo}` : ''
+  const { data } = await apiClient.get<DescuentoResponseDTO[]>(`/Descuentos${params}`)
+  return data
+}
+
+export const createDescuento = async (dto: DescuentoCreateDTO): Promise<DescuentoResponseDTO> => {
+  const { data } = await apiClient.post<DescuentoResponseDTO>('/Descuentos', dto)
+  return data
+}
+
+export const updateDescuento = async (id: number, dto: DescuentoUpdateDTO): Promise<DescuentoResponseDTO> => {
+  const { data } = await apiClient.put<DescuentoResponseDTO>(`/Descuentos/${id}`, dto)
+  return data
+}
+
+// ── Cupones ───────────────────────────────────────────────────────────────────
+
+export interface CuponResponseDTO {
+  id: number
+  codigo: string
+  tipo: 'Porcentaje' | 'MontoFijo'
+  valor: number
+  fechaVencimiento?: string
+  limiteUsos?: number
+  usosActuales: number
+  pedidoMinimo?: number
+  activo: boolean
+  fechaCreacion: string
+}
+
+export interface CuponMetricasDTO {
+  cuponId: number
+  codigo: string
+  usosTotales: number
+  usosActivos: number
+  usosLiberados: number
+  montoTotalDescontado: number
+  montoTotalLiberado: number
+  primerUso?: string
+  ultimoUso?: string
+}
+
+export interface CuponCreateDTO {
+  codigo: string
+  tipo: 'Porcentaje' | 'MontoFijo'
+  valor: number
+  fechaVencimiento?: string
+  limiteUsos?: number
+  pedidoMinimo?: number
+}
+
+export interface CuponUpdateDTO extends CuponCreateDTO {
+  activo: boolean
+}
+
+export const getCupones = async (activo?: boolean): Promise<CuponResponseDTO[]> => {
+  const params = activo !== undefined ? `?activo=${activo}` : ''
+  const { data } = await apiClient.get<CuponResponseDTO[]>(`/Cupones${params}`)
+  return data
+}
+
+export const getCuponMetricas = async (id: number): Promise<CuponMetricasDTO> => {
+  const { data } = await apiClient.get<CuponMetricasDTO>(`/Cupones/${id}/metricas`)
+  return data
+}
+
+export const createCupon = async (dto: CuponCreateDTO): Promise<CuponResponseDTO> => {
+  const { data } = await apiClient.post<CuponResponseDTO>('/Cupones', dto)
+  return data
+}
+
+export const updateCupon = async (id: number, dto: CuponUpdateDTO): Promise<CuponResponseDTO> => {
+  const { data } = await apiClient.put<CuponResponseDTO>(`/Cupones/${id}`, dto)
+  return data
+}
+
 // ── Reportes ──────────────────────────────────────────────────────────────────
 
 export interface ReportesData {
@@ -356,5 +473,26 @@ export interface ReportesData {
 
 export const getReportes = async (adminId: number): Promise<ReportesData> => {
   const { data } = await apiClient.get<ReportesData>(`/reportes?adminId=${adminId}`)
+  return data
+}
+
+// ── MercadoPago ───────────────────────────────────────────────────────────────
+
+export const getEstadoMercadoPago = async (): Promise<EstadoMercadoPagoResponse> => {
+  const { data } = await apiClient.get<EstadoMercadoPagoResponse>('/MercadoPago/estado')
+  return data
+}
+
+export const getOAuthUrlMercadoPago = async (): Promise<OAuthUrlResponse> => {
+  const { data } = await apiClient.get<OAuthUrlResponse>('/MercadoPago/oauth/url')
+  return data
+}
+
+export const desconectarMercadoPago = async (): Promise<void> => {
+  await apiClient.post('/MercadoPago/desconectar')
+}
+
+export const getDiagnosticoMercadoPago = async (): Promise<MercadoPagoDiagnosticoResponse> => {
+  const { data } = await apiClient.get<MercadoPagoDiagnosticoResponse>('/MercadoPago/diagnostico')
   return data
 }

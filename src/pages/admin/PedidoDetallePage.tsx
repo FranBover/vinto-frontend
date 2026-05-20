@@ -4,6 +4,7 @@ import AdminLayout from '../../components/admin/AdminLayout'
 import { getPedidoById, updateEstadoPedido, getComentariosPedido, addComentarioPedido, getComanda, getTicket } from '../../api/adminApi'
 import type { ComentarioPedido, ComandaResponseDTO, TicketResponseDTO } from '../../api/adminApi'
 import ImpresionModal from '../../components/admin/ImpresionModal'
+import PagoMercadoPagoBadge from '../../components/admin/PagoMercadoPagoBadge'
 import type { Pedido, EstadoPedido } from '../../types'
 
 const MAX_CHARS = 500
@@ -304,6 +305,12 @@ export default function PedidoDetallePage() {
               </div>
             )}
           </div>
+          <PagoMercadoPagoBadge
+            status={pedido.mercadoPagoStatus}
+            statusDetail={pedido.mercadoPagoStatusDetail}
+            paymentId={pedido.mercadoPagoPaymentId}
+            fechaPago={pedido.mercadoPagoFechaPago}
+          />
         </Section>
 
         {/* Productos */}
@@ -333,9 +340,41 @@ export default function PedidoDetallePage() {
                 </span>
               </div>
             ))}
-            <div className="pt-3 border-t border-[#e8e8e8] flex justify-between font-bold">
-              <span>Total</span>
-              <span>${pedido.total.toLocaleString('es-AR')}</span>
+            <div className="pt-3 border-t border-[#e8e8e8] space-y-1.5">
+              {((pedido.montoDescuentoProductos ?? 0) > 0 || (pedido.montoDescuentoCupon ?? 0) > 0) && (
+                <div className="flex justify-between text-sm text-[#666]">
+                  <span>Subtotal sin descuentos</span>
+                  <span>${(pedido.subtotalSinDescuentos ?? 0).toLocaleString('es-AR')}</span>
+                </div>
+              )}
+              {(pedido.montoDescuentoProductos ?? 0) > 0 && (
+                <div className="flex justify-between text-sm" style={{ color: '#ef4444' }}>
+                  <span>Descuentos en productos</span>
+                  <span>-${(pedido.montoDescuentoProductos ?? 0).toLocaleString('es-AR')}</span>
+                </div>
+              )}
+              {(pedido.montoDescuentoCupon ?? 0) > 0 && (
+                <div className="flex justify-between text-sm" style={{ color: '#ef4444' }}>
+                  <span>Cupón {pedido.codigoCupon}</span>
+                  <span>-${(pedido.montoDescuentoCupon ?? 0).toLocaleString('es-AR')}</span>
+                </div>
+              )}
+              {pedido.subtotal != null && (
+                <div className="flex justify-between text-sm text-[#666]">
+                  <span>Subtotal</span>
+                  <span>${pedido.subtotal.toLocaleString('es-AR')}</span>
+                </div>
+              )}
+              {(pedido.costoEnvio ?? 0) > 0 && (
+                <div className="flex justify-between text-sm text-[#666]">
+                  <span>Envío</span>
+                  <span>${(pedido.costoEnvio ?? 0).toLocaleString('es-AR')}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-base pt-1.5 border-t border-[#e8e8e8]">
+                <span>Total</span>
+                <span>${pedido.total.toLocaleString('es-AR')}</span>
+              </div>
             </div>
           </div>
         </Section>

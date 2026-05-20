@@ -1,13 +1,11 @@
 import { useEffect } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useCartStore } from '../../store/cartStore'
-import type { CartItem } from '../../store/cartStore'
 import type { LocalPublico, PedidoCreateResponse, FormaPago, FormaEntrega } from '../../types'
 
 interface LocationState {
   pedido: PedidoCreateResponse
   local: LocalPublico
-  items: CartItem[]
   nombreCliente: string
   telefono: string
   formaPago: FormaPago
@@ -30,70 +28,6 @@ const LABEL_ENTREGA: Record<FormaEntrega, string> = {
 }
 
 const pesos = (n: number) => `$${n.toLocaleString('es-AR')}`
-
-function formatFecha(): string {
-  const now = new Date()
-  const dd = String(now.getDate()).padStart(2, '0')
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const yy = String(now.getFullYear()).slice(2)
-  const hh = String(now.getHours()).padStart(2, '0')
-  const min = String(now.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${yy} - ${hh}:${min} hs`
-}
-
-function buildWhatsAppText(state: LocationState): string {
-  const { pedido, local, items, nombreCliente, telefono, formaPago,
-          formaEntrega, direccionCliente, referencia, ubicacionUrl, montoPagoEfectivo } = state
-
-  const lines: string[] = []
-
-  lines.push('*¡Nuevo pedido!* 🛍️')
-  lines.push('')
-  lines.push(`*#${pedido.codigoSeguimiento}* · ${local.nombreLocal}`)
-  lines.push(formatFecha())
-  lines.push('')
-  lines.push('*Cliente*')
-  lines.push(nombreCliente)
-  lines.push(telefono)
-  lines.push('')
-  lines.push('*Productos*')
-  for (const item of items) {
-    const precioUnitario = (item.producto.precio ?? 0) + item.extras.reduce((s, e) => s + e.precioAdicional, 0)
-    const varianteLabel = item.varianteDescripcion ? ` (${item.varianteDescripcion})` : ''
-    lines.push(`${item.cantidad}x ${item.producto.nombre}${varianteLabel}: ${pesos(precioUnitario * item.cantidad)}`)
-    for (const extra of item.extras) {
-      lines.push(`  + ${extra.nombre}: ${pesos(extra.precioAdicional)}`)
-    }
-  }
-  lines.push('')
-  if (pedido.subtotal !== pedido.total) {
-    lines.push(`*Subtotal:* ${pesos(pedido.subtotal)}`)
-  }
-  if (formaEntrega === 'Delivery' && local.costoEnvio != null) {
-    lines.push(`*Costo de envío:* ${pesos(local.costoEnvio)}`)
-  }
-  lines.push(`*Total:* ${pesos(pedido.total)}`)
-  lines.push('')
-  lines.push(`*Pago:* ${LABEL_PAGO[formaPago]}`)
-  if (formaPago === 'Efectivo' && montoPagoEfectivo) {
-    lines.push(`*Paga con:* ${pesos(montoPagoEfectivo)}`)
-  }
-  if (formaPago === 'Transferencia') {
-    if (local.aliasTransferencia) lines.push(`Alias: ${local.aliasTransferencia}`)
-    if (local.titularCuenta) lines.push(`Titular: ${local.titularCuenta}`)
-  }
-  lines.push('')
-  lines.push(`*Entrega:* ${LABEL_ENTREGA[formaEntrega]}`)
-  if (formaEntrega === 'Delivery') {
-    if (direccionCliente) lines.push(`Dirección: ${direccionCliente}`)
-    if (referencia) lines.push(`Referencia: ${referencia}`)
-    if (ubicacionUrl) lines.push(`Ubicación: ${ubicacionUrl}`)
-  }
-  lines.push('')
-  lines.push('_¡Espero tu confirmación!_')
-
-  return encodeURIComponent(lines.join('\n'))
-}
 
 function getWhatsAppNumber(linkWhatsapp: string | null): string | null {
   if (!linkWhatsapp) return null
@@ -137,7 +71,7 @@ export default function ConfirmacionPage() {
 
   const waNumber = getWhatsAppNumber(local.linkWhatsapp)
   const waLink = waNumber
-    ? `https://wa.me/${waNumber}?text=${buildWhatsAppText(state)}`
+    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(pedido.resumenWhatsApp)}`
     : null
 
   return (
@@ -213,6 +147,16 @@ export default function ConfirmacionPage() {
           <p className="font-bold text-base">Total</p>
           <p className="font-bold text-2xl">${pedido.total.toLocaleString('es-AR')}</p>
         </div>
+      </div>
+
+      {/* ── Resumen del pedido ─────────────────────────────────── */}
+      <div className="px-4 pb-6">
+        <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-2">
+          Resumen
+        </p>
+        <pre className="text-xs text-[#444] whitespace-pre-wrap font-sans leading-relaxed bg-[#f5f5f5] px-4 py-4 overflow-auto">
+          {pedido.resumenWhatsApp}
+        </pre>
       </div>
 
       {/* ── WhatsApp CTA ───────────────────────────────────────── */}

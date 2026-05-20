@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
+import { useCartStore } from '../../store/cartStore'
 import CartBar from '../../components/client/CartBar'
+import BannerDescuentos from '../../components/client/BannerDescuentos'
 
 export default function MenuPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const { data, loading, error, fetchMenu, clearCache } = useMenuStore()
+  const asegurarSlug = useCartStore(s => s.asegurarSlug)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
@@ -14,6 +17,10 @@ export default function MenuPage() {
   useEffect(() => {
     if (slug) fetchMenu(slug)
   }, [slug, fetchMenu])
+
+  useEffect(() => {
+    if (slug) asegurarSlug(slug)
+  }, [slug, asegurarSlug])
 
   const menu = slug ? data[slug] : null
 
@@ -41,7 +48,7 @@ export default function MenuPage() {
     )
   }
 
-  const { local, categorias } = menu
+  const { local, categorias, descuentosPedidoCompleto } = menu
   const isOpen = local.esActivo
 
   return (
@@ -154,6 +161,11 @@ export default function MenuPage() {
         <div className="bg-[#1a1a1a] text-white text-center py-2.5 text-[11px] font-bold tracking-widest uppercase">
           Cerrado por ahora · Volvemos pronto
         </div>
+      )}
+
+      {/* ── Discount banner ────────────────────────────────────── */}
+      {descuentosPedidoCompleto && descuentosPedidoCompleto.length > 0 && (
+        <BannerDescuentos descuentos={descuentosPedidoCompleto} />
       )}
 
       {/* ── Category list ──────────────────────────────────────── */}

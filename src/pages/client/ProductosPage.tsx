@@ -5,14 +5,30 @@ import CartBar from '../../components/client/CartBar'
 import { BASE_URL } from '../../config'
 import type { Producto } from '../../types'
 
-function getPrecioText(producto: Producto): string {
+interface PrecioInfo {
+  precioBase: number
+  precioFinal: number
+  porcentaje: number
+  prefijo: string
+}
+
+function getPrecioInfo(producto: Producto): PrecioInfo {
   if (producto.tieneVariantes && producto.variantes?.length) {
     const disponibles = producto.variantes.filter(v => v.disponible && (v.stock === null || v.stock > 0))
-    if (disponibles.length === 0) return 'Agotado'
-    const min = Math.min(...disponibles.map(v => v.precio))
-    return `Desde $${min.toLocaleString('es-AR')}`
+    if (disponibles.length === 0) {
+      return { precioBase: 0, precioFinal: 0, porcentaje: 0, prefijo: 'Agotado' }
+    }
+    const minBase = Math.min(...disponibles.map(v => v.precio))
+    const minFinal = Math.min(...disponibles.map(v => v.precioConDescuento ?? v.precio))
+    const maxPct = Math.max(...disponibles.map(v => v.porcentajeDescuentoTotal ?? 0))
+    return { precioBase: minBase, precioFinal: minFinal, porcentaje: maxPct, prefijo: 'Desde ' }
   }
-  return `$${(producto.precio ?? 0).toLocaleString('es-AR')}`
+  return {
+    precioBase: producto.precio ?? 0,
+    precioFinal: producto.precioConDescuento ?? producto.precio ?? 0,
+    porcentaje: producto.porcentajeDescuentoTotal ?? 0,
+    prefijo: '',
+  }
 }
 
 function resolveImageUrl(producto: Producto): string | null {
@@ -86,6 +102,10 @@ export default function ProductosPage() {
         ) : (
           productos.map(producto => {
             const imgSrc = resolveImageUrl(producto)
+            const { precioBase, precioFinal, porcentaje, prefijo } = getPrecioInfo(producto)
+            const hasDiscount = porcentaje > 0 && precioFinal < precioBase
+            const isAgotado = producto.tieneVariantes &&
+              producto.variantes?.filter(v => v.disponible && (v.stock === null || v.stock > 0)).length === 0
             return (
               <li key={producto.id} className="border-b border-[#e8e8e8]">
                 <div className="flex items-start justify-between gap-4 px-4 py-5">
@@ -96,12 +116,25 @@ export default function ProductosPage() {
                         {producto.descripcion}
                       </p>
                     )}
-                    <p className="font-bold text-sm mt-2">
-                      {getPrecioText(producto)}
-                    </p>
+                    {isAgotado ? (
+                      <p className="font-bold text-sm mt-2 text-[#999]">Agotado</p>
+                    ) : hasDiscount ? (
+                      <div className="mt-2 flex items-baseline gap-2">
+                        <span className="font-bold text-base text-[#ef4444]">
+                          {prefijo}${precioFinal.toLocaleString('es-AR')}
+                        </span>
+                        <span className="text-xs text-[#9ca3af] line-through">
+                          ${precioBase.toLocaleString('es-AR')}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="font-bold text-sm mt-2">
+                        {prefijo}${precioBase.toLocaleString('es-AR')}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <div className="w-[60px] h-[60px] overflow-hidden bg-[#f5f5f5]">
+                    <div className="relative w-[60px] h-[60px] overflow-hidden bg-[#f5f5f5]">
                       {imgSrc && !imgErrors.has(producto.id) ? (
                         <img
                           src={imgSrc}
@@ -113,6 +146,11 @@ export default function ProductosPage() {
                         <div className="w-full h-full flex items-center justify-center text-2xl select-none">
                           🍽️
                         </div>
+                      )}
+                      {hasDiscount && (
+                        <span className="absolute top-0 right-0 bg-[#ef4444] text-white text-[9px] font-bold leading-none px-1 py-0.5">
+                          -{porcentaje}%
+                        </span>
                       )}
                     </div>
                     <button

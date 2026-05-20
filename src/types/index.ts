@@ -59,6 +59,8 @@ export interface TipoVarianteMenu {
 export interface VarianteMenu {
   id: number
   precio: number
+  precioConDescuento?: number
+  porcentajeDescuentoTotal?: number
   stock: number | null
   disponible: boolean
   opcion1Id: number
@@ -66,11 +68,25 @@ export interface VarianteMenu {
   descripcion: string
 }
 
+export interface DescuentoAplicado {
+  nombre: string
+  tipo: string
+}
+
+export interface DescuentoPedidoCompleto {
+  nombre: string
+  tipo: string
+  valor: number
+}
+
 export interface Producto {
   id: number
   nombre: string
   descripcion: string
   precio: number | null
+  precioConDescuento?: number
+  porcentajeDescuentoTotal?: number
+  descuentosAplicados?: DescuentoAplicado[]
   imagenUrl: string
   disponible: boolean
   categoriaId: number
@@ -146,8 +162,20 @@ export interface Pedido {
   direccionCliente: string | null
   referenciaDireccion: string | null
   ubicacionUrl: string | null
+  subtotalSinDescuentos?: number
+  montoDescuentoProductos?: number
+  montoDescuentoCupon?: number
+  codigoCupon?: string
+  subtotal?: number
+  costoEnvio?: number
   total: number
   detalles: DetallePedido[]
+  mercadoPagoPaymentId?: string | null
+  mercadoPagoStatus?: string | null
+  mercadoPagoStatusDetail?: string | null
+  mercadoPagoFechaPago?: string | null
+  mercadoPagoPreferenceId?: string | null
+  mercadoPagoCollectionId?: string | null
 }
 
 // ── Respuesta creación de pedido ─────────────────────────────────────────────
@@ -182,7 +210,18 @@ export interface CrearPedidoDto {
   direccionCliente?: string
   referenciaDireccion?: string
   ubicacionUrl?: string
+  codigoCupon?: string
   detalles: CrearDetalleDto[]
+}
+
+export interface ValidarCuponResponse {
+  valido: boolean
+  codigo?: string
+  tipo?: string
+  valor?: number
+  montoDescuento?: number
+  nuevoSubtotal?: number
+  motivo?: string
 }
 
 export interface UpdateEstadoDto {
@@ -217,6 +256,7 @@ export interface LocalPublico {
   ubicacionUrl: string | null
   zonaEnvio: 'Ciudad' | 'Nacional'
   costoEnvio: number | null
+  mercadoPagoHabilitado: boolean
 }
 
 export interface CategoriaPublica {
@@ -228,4 +268,46 @@ export interface CategoriaPublica {
 export interface MenuPublico {
   local: LocalPublico
   categorias: CategoriaPublica[]
+  descuentosPedidoCompleto?: DescuentoPedidoCompleto[]
+}
+
+// ── MercadoPago ──────────────────────────────────────────────────────────────
+
+export interface CrearPreferenciaRequest {
+  codigoSeguimiento: string
+}
+
+export interface CrearPreferenciaResponse {
+  preferenceId: string
+  initPoint: string
+  sandboxInitPoint: string
+}
+
+export interface EstadoPagoPublicoResponse {
+  encontrado: boolean
+  estado?: string
+  mercadoPagoStatus?: string
+  total?: number
+  resumenWhatsApp?: string
+  nombreCliente?: string
+  linkWhatsapp?: string
+}
+
+// ── MercadoPago (admin) ──────────────────────────────────────────────────────
+
+export interface EstadoMercadoPagoResponse {
+  conectado: boolean
+  mercadoPagoUserId?: string | null
+  tokenExpiraEn?: string | null
+}
+
+export interface OAuthUrlResponse {
+  url: string
+  state: string
+}
+
+export interface MercadoPagoDiagnosticoResponse {
+  conectado: boolean
+  tokenExpirado: boolean
+  pedidosPendientesConMP: number
 }

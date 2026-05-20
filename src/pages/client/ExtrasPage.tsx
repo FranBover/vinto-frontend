@@ -53,6 +53,14 @@ function isOpcionAvailable(
   return variantes.some(v => v.opcion2Id === opcionId && isVarianteAvailable(v))
 }
 
+function getPrecioFinal(v: VarianteMenu): number {
+  return v.precioConDescuento ?? v.precio
+}
+
+function tieneDescuento(v: VarianteMenu): boolean {
+  return v.precioConDescuento != null && v.precioConDescuento < v.precio
+}
+
 export default function ExtrasPage() {
   const { slug, categoriaId, productoId } = useParams<{
     slug: string
@@ -110,7 +118,10 @@ export default function ExtrasPage() {
   }, [varianteActiva?.id])
 
   const variantesDisponibles = variantesMenu.filter(isVarianteAvailable)
-  const minPrecioVariantes = variantesDisponibles.length > 0
+  const minPrecioFinalVariantes = variantesDisponibles.length > 0
+    ? Math.min(...variantesDisponibles.map(v => getPrecioFinal(v)))
+    : 0
+  const minPrecioBaseVariantes = variantesDisponibles.length > 0
     ? Math.min(...variantesDisponibles.map(v => v.precio))
     : 0
 
@@ -139,28 +150,30 @@ export default function ExtrasPage() {
 
   const extrasTotal = selectedExtras.reduce((s, e) => s + e.precioAdicional, 0)
   const basePrecio = tieneVariantes
-    ? (varianteActiva?.precio ?? 0)
+    ? (varianteActiva != null ? getPrecioFinal(varianteActiva) : 0)
     : (producto.precio ?? 0)
   const precioUnitario = basePrecio + extrasTotal
   const totalItem = precioUnitario * cantidad
-
-  const precioDisplay = tieneVariantes
-    ? varianteActiva
-      ? `$${varianteActiva.precio.toLocaleString('es-AR')}`
-      : variantesDisponibles.length > 0
-        ? `Desde $${minPrecioVariantes.toLocaleString('es-AR')}`
-        : 'Agotado'
-    : `$${(producto.precio ?? 0).toLocaleString('es-AR')}`
 
   const canAdd = isOpen && (!tieneVariantes || (varianteActiva !== null && isVarianteAvailable(varianteActiva)))
 
   const handleAgregar = () => {
     if (!canAdd) return
-    const precioFinal = tieneVariantes && varianteActiva
+    const precioRaw = tieneVariantes && varianteActiva
       ? varianteActiva.precio
       : (producto.precio ?? 0)
+    const precioDesc = tieneVariantes && varianteActiva
+      ? varianteActiva.precioConDescuento
+      : producto.precioConDescuento
     agregarItem(
-      { ...producto, precio: precioFinal },
+      {
+        ...producto,
+        precio: precioRaw,
+        precioConDescuento: precioDesc != null && precioDesc < precioRaw ? precioDesc : undefined,
+        porcentajeDescuentoTotal: tieneVariantes && varianteActiva
+          ? varianteActiva.porcentajeDescuentoTotal
+          : producto.porcentajeDescuentoTotal,
+      },
       selectedExtras,
       cantidad,
       varianteActiva?.id,
@@ -260,7 +273,48 @@ export default function ExtrasPage() {
               {producto.descripcion}
             </p>
           )}
-          <p className="font-bold text-base mt-3">{precioDisplay}</p>
+          {tieneVariantes ? (
+            varianteActiva ? (
+              tieneDescuento(varianteActiva) ? (
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  <span className="font-bold text-base text-[#ef4444]">
+                    ${varianteActiva.precioConDescuento!.toLocaleString('es-AR')}
+                  </span>
+                  <span className="text-sm text-[#9ca3af] line-through">
+                    ${varianteActiva.precio.toLocaleString('es-AR')}
+                  </span>
+                  <span className="bg-[#ef4444] text-white text-[9px] font-bold leading-none px-1 py-0.5">
+                    -{varianteActiva.porcentajeDescuentoTotal}%
+                  </span>
+                </div>
+              ) : (
+                <p className="font-bold text-base mt-3">
+                  ${varianteActiva.precio.toLocaleString('es-AR')}
+                </p>
+              )
+            ) : variantesDisponibles.length > 0 ? (
+              minPrecioFinalVariantes < minPrecioBaseVariantes ? (
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  <span className="font-bold text-base text-[#ef4444]">
+                    Desde ${minPrecioFinalVariantes.toLocaleString('es-AR')}
+                  </span>
+                  <span className="text-sm text-[#9ca3af] line-through">
+                    ${minPrecioBaseVariantes.toLocaleString('es-AR')}
+                  </span>
+                </div>
+              ) : (
+                <p className="font-bold text-base mt-3">
+                  Desde ${minPrecioFinalVariantes.toLocaleString('es-AR')}
+                </p>
+              )
+            ) : (
+              <p className="font-bold text-sm mt-3 text-[#999]">Agotado</p>
+            )
+          ) : (
+            <p className="font-bold text-base mt-3">
+              ${(producto.precio ?? 0).toLocaleString('es-AR')}
+            </p>
+          )}
           {tieneVariantes && varianteActiva && !isVarianteAvailable(varianteActiva) && (
             <p className="text-sm font-bold mt-1" style={{ color: '#dc2626' }}>Agotado</p>
           )}

@@ -1,13 +1,13 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { NuevoPedidoPayload } from '../store/notificationsStore'
+import type { PagoConfirmadoPayload } from '../../store/notificationsStore'
 
 interface Props {
-  pedido: NuevoPedidoPayload
+  pago: PagoConfirmadoPayload
   onClose: () => void
 }
 
-export default function NuevoPedidoToast({ pedido, onClose }: Props) {
+export default function PagoConfirmadoToast({ pago, onClose }: Props) {
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export default function NuevoPedidoToast({ pedido, onClose }: Props) {
     <div
       style={{
         backgroundColor: '#ffffff',
-        borderLeft: '4px solid #2d5a27',
+        borderLeft: '4px solid #1e6ec7',
         boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
         padding: '16px 20px',
         minWidth: '280px',
@@ -29,21 +29,21 @@ export default function NuevoPedidoToast({ pedido, onClose }: Props) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
         <div>
-          <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#2d5a27', marginBottom: '4px' }}>
-            Nuevo pedido
+          <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#1e6ec7', marginBottom: '4px' }}>
+            Pago confirmado
           </p>
           <p style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>
-            {pedido.nombreCliente} — ${pedido.total.toLocaleString('es-AR')}
+            {pago.nombreCliente} — ${pago.monto.toLocaleString('es-AR')}
           </p>
           <button
             onClick={() => {
-              navigate(`/admin/pedidos/${pedido.pedidoId}`)
+              navigate(`/admin/pedidos/${pago.pedidoId}`)
               onClose()
             }}
             style={{
               fontSize: '12px',
               fontWeight: 600,
-              color: '#2d5a27',
+              color: '#1e6ec7',
               background: 'none',
               border: 'none',
               padding: 0,

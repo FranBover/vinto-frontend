@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../../store/cartStore'
 import { useMenuStore } from '../../store/menuStore'
 import { crearPedido } from '../../api/publicApi'
+import { crearPreferenciaMP } from '../../api/mercadoPagoApi'
 import type { FormaPago, FormaEntrega, CrearPedidoDto } from '../../types'
 import DireccionAutocomplete from '../../components/DireccionAutocomplete'
+import CuponInput, { type CuponAplicado } from '../../components/client/CuponInput'
 
 const LABEL_FORMA_PAGO: Record<FormaPago, string> = {
   Efectivo: 'Efectivo',
@@ -16,8 +18,8 @@ export default function CheckoutPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const items = useCartStore(s => s.items)
-  const total = useCartStore(s => s.total())
   const menu = useMenuStore(s => (slug ? s.data[slug] : null))
+  const [cuponAplicado, setCuponAplicado] = useState<CuponAplicado | null>(null)
 
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
@@ -45,7 +47,29 @@ export default function CheckoutPage() {
     if (items.length === 0) navigate(`/${slug}`)
   }, [items.length, navigate, slug])
 
+  // Si MP se deshabilita y el cliente tenía Tarjeta seleccionada, resetear
+  useEffect(() => {
+    if (formaPago === 'Tarjeta' && !menu?.local.mercadoPagoHabilitado) {
+      setFormaPago('Efectivo')
+    }
+  }, [menu?.local.mercadoPagoHabilitado, formaPago])
+
   if (items.length === 0) return null
+
+  const subtotalBase = items.reduce((sum, i) => {
+    const extrasTotal = i.extras.reduce((s, e) => s + e.precioAdicional, 0)
+    return sum + ((i.producto.precio ?? 0) + extrasTotal) * i.cantidad
+  }, 0)
+
+  const subtotalConDescuentos = items.reduce((sum, i) => {
+    const extrasTotal = i.extras.reduce((s, e) => s + e.precioAdicional, 0)
+    return sum + ((i.producto.precioConDescuento ?? i.producto.precio ?? 0) + extrasTotal) * i.cantidad
+  }, 0)
+
+  const descuentoProductos = subtotalBase - subtotalConDescuentos
+  const descuentoCupon = cuponAplicado?.montoDescuento ?? 0
+  const costoEnvio = formaEntrega === 'Delivery' && menu?.local.costoEnvio != null ? menu.local.costoEnvio : 0
+  const totalFinal = subtotalConDescuentos - descuentoCupon + costoEnvio
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -106,10 +130,34 @@ export default function CheckoutPage() {
       ...(formaPago === 'Efectivo' && montoPago && {
         montoPagoEfectivo: parseFloat(montoPago),
       }),
+      ...(cuponAplicado && { codigoCupon: cuponAplicado.codigo }),
     }
 
     try {
       const pedido = await crearPedido(slug!, dto)
+
+      // Si pagó con Mercado Pago, redirigir a la preferencia
+      if (formaPago === 'Tarjeta') {
+        try {
+          const preferencia = await crearPreferenciaMP(
+            slug!,
+            pedido.pedidoId,
+            pedido.codigoSeguimiento,
+          )
+          // No vaciamos carrito acá — se hace en PagoSuccess/Pending o al tocar WhatsApp en failure
+          window.location.href = preferencia.initPoint
+          return
+        } catch {
+          setError(
+            'El pedido se creó pero no se pudo iniciar el pago con Mercado Pago. ' +
+            'Contactá al local por WhatsApp con el código ' + pedido.codigoSeguimiento + '.'
+          )
+          setLoading(false)
+          return
+        }
+      }
+
+      // Flujo normal para Efectivo / Transferencia
       navigate(`/${slug}/confirmacion`, {
         state: {
           pedido,
@@ -131,6 +179,12 @@ export default function CheckoutPage() {
       setError('No se pudo enviar el pedido. Revisá tu conexión e intentá de nuevo.')
       setLoading(false)
     }
+  }
+
+  // Opciones de forma de pago disponibles según el local
+  const opcionesFormaPago: FormaPago[] = ['Efectivo', 'Transferencia']
+  if (menu?.local.mercadoPagoHabilitado) {
+    opcionesFormaPago.push('Tarjeta')
   }
 
   const inputCls =
@@ -410,22 +464,20 @@ export default function CheckoutPage() {
         <div>
           <p className={labelCls}>Forma de pago</p>
           <div className="flex border border-[#1a1a1a]">
-            {(['Efectivo', 'Transferencia', 'Tarjeta'] as FormaPago[]).map(
-              (opt, idx) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => setFormaPago(opt)}
-                  className={`flex-1 py-3 text-xs font-bold rounded-none transition-colors ${
-                    formaPago === opt
-                      ? 'bg-[#1a1a1a] text-white'
-                      : 'bg-white text-[#1a1a1a] hover:bg-[#f5f5f5]'
-                  } ${idx < 2 ? 'border-r border-[#1a1a1a]' : ''}`}
-                >
-                  {LABEL_FORMA_PAGO[opt]}
-                </button>
-              )
-            )}
+            {opcionesFormaPago.map((opt, idx) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setFormaPago(opt)}
+                className={`flex-1 py-3 text-xs font-bold rounded-none transition-colors ${
+                  formaPago === opt
+                    ? 'bg-[#1a1a1a] text-white'
+                    : 'bg-white text-[#1a1a1a] hover:bg-[#f5f5f5]'
+                } ${idx < opcionesFormaPago.length - 1 ? 'border-r border-[#1a1a1a]' : ''}`}
+              >
+                {LABEL_FORMA_PAGO[opt]}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -440,8 +492,8 @@ export default function CheckoutPage() {
               type="number"
               value={montoPago}
               onChange={e => setMontoPago(e.target.value)}
-              placeholder={`Mín. $${total.toLocaleString('es-AR')}`}
-              min={total}
+              placeholder={`Mín. $${totalFinal.toLocaleString('es-AR')}`}
+              min={totalFinal}
               className={inputCls}
             />
           </div>
@@ -452,13 +504,12 @@ export default function CheckoutPage() {
           <div className="px-4 py-3 border-b border-[#e8e8e8]">
             <p className={labelCls}>Resumen del pedido</p>
           </div>
+
+          {/* Items */}
           <div className="px-4 py-3 space-y-2">
             {items.map(item => {
-              const extrasTotal = item.extras.reduce(
-                (s, e) => s + e.precioAdicional,
-                0
-              )
-              const precioUnitario = (item.producto.precio ?? 0) + extrasTotal
+              const extrasTotal = item.extras.reduce((s, e) => s + e.precioAdicional, 0)
+              const precioUnitario = (item.producto.precioConDescuento ?? item.producto.precio ?? 0) + extrasTotal
               return (
                 <div
                   key={`${item.producto.id}-${item.extras.map(e => e.id).join(',')}${item.varianteId != null ? `:${item.varianteId}` : ''}`}
@@ -482,21 +533,45 @@ export default function CheckoutPage() {
               )
             })}
           </div>
-          {formaEntrega === 'Delivery' && menu?.local.costoEnvio != null && (
-            <div className="px-4 py-2 border-t border-[#e8e8e8] flex justify-between text-sm text-[#666]">
-              <span>Costo de envío</span>
-              <span>${menu.local.costoEnvio.toLocaleString('es-AR')}</span>
+
+          {/* Coupon input */}
+          <div className="px-4 py-3 border-t border-[#e8e8e8]">
+            <CuponInput
+              slug={slug!}
+              subtotal={subtotalConDescuentos}
+              onCuponAplicado={setCuponAplicado}
+            />
+          </div>
+
+          {/* Totals breakdown */}
+          <div className="px-4 py-3 border-t border-[#e8e8e8] space-y-2 text-sm">
+            <div className="flex justify-between text-[#666]">
+              <span>Subtotal</span>
+              <span>${subtotalBase.toLocaleString('es-AR')}</span>
             </div>
-          )}
-          <div className="px-4 py-3 border-t border-[#e8e8e8] flex justify-between font-bold">
+            {descuentoProductos > 0 && (
+              <div className="flex justify-between text-[#ef4444]">
+                <span>Descuentos en productos</span>
+                <span>-${descuentoProductos.toLocaleString('es-AR')}</span>
+              </div>
+            )}
+            {cuponAplicado && (
+              <div className="flex justify-between text-[#ef4444]">
+                <span>Cupón {cuponAplicado.codigo}</span>
+                <span>-${cuponAplicado.montoDescuento.toLocaleString('es-AR')}</span>
+              </div>
+            )}
+            {formaEntrega === 'Delivery' && menu?.local.costoEnvio != null && (
+              <div className="flex justify-between text-[#666]">
+                <span>Envío</span>
+                <span>${menu.local.costoEnvio.toLocaleString('es-AR')}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="px-4 py-3 border-t border-[#e8e8e8] flex justify-between font-bold text-base">
             <span>Total</span>
-            <span>
-              ${(
-                formaEntrega === 'Delivery' && menu?.local.costoEnvio != null
-                  ? total + menu.local.costoEnvio
-                  : total
-              ).toLocaleString('es-AR')}
-            </span>
+            <span>${totalFinal.toLocaleString('es-AR')}</span>
           </div>
         </div>
 
