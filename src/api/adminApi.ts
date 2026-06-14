@@ -4,6 +4,8 @@ import type {
   UpdateEstadoDto,
   Producto,
   Categoria,
+  CategoriaCreateDTO,
+  CategoriaUpdateDTO,
   ProductoExtra,
   ImagenResponse,
   TipoVariante,
@@ -13,6 +15,8 @@ import type {
   EstadoMercadoPagoResponse,
   OAuthUrlResponse,
   MercadoPagoDiagnosticoResponse,
+  Periodo,
+  DashboardReporte,
 } from '../types'
 
 export type { ImagenResponse }
@@ -86,18 +90,21 @@ export const getCategorias = async (adminId: number): Promise<Categoria[]> => {
   return data
 }
 
-export const createCategoria = async (categoria: Omit<Categoria, 'id'>): Promise<Categoria> => {
-  const { data } = await apiClient.post<Categoria>('/categorias', categoria)
+export const createCategoria = async (dto: CategoriaCreateDTO): Promise<Categoria> => {
+  const { data } = await apiClient.post<Categoria>('/categorias', dto)
   return data
 }
 
-export const updateCategoria = async (id: number, categoria: Partial<Omit<Categoria, 'id'>>): Promise<Categoria> => {
-  const { data } = await apiClient.put<Categoria>(`/categorias/${id}`, categoria)
-  return data
+export const updateCategoria = async (id: number, dto: CategoriaUpdateDTO): Promise<void> => {
+  await apiClient.put(`/categorias/${id}`, dto)
 }
 
 export const deleteCategoria = async (id: number): Promise<void> => {
   await apiClient.delete(`/categorias/${id}`)
+}
+
+export const reordenarCategorias = async (orderedIds: number[]): Promise<void> => {
+  await apiClient.patch('/categorias/reordenar', { orderedIds })
 }
 
 // ── Extras ────────────────────────────────────────────────────────────────────
@@ -464,15 +471,8 @@ export const updateCupon = async (id: number, dto: CuponUpdateDTO): Promise<Cupo
 
 // ── Reportes ──────────────────────────────────────────────────────────────────
 
-export interface ReportesData {
-  totalPedidos: number
-  totalVentas: number
-  pedidosPorEstado: Record<string, number>
-  ventasPorDia: { fecha: string; total: number }[]
-}
-
-export const getReportes = async (adminId: number): Promise<ReportesData> => {
-  const { data } = await apiClient.get<ReportesData>(`/reportes?adminId=${adminId}`)
+export const getDashboardReporte = async (periodo: Periodo): Promise<DashboardReporte> => {
+  const { data } = await apiClient.get<DashboardReporte>(`/Reportes/dashboard?periodo=${periodo}`)
   return data
 }
 

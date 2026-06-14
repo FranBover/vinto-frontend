@@ -8,10 +8,18 @@ import type { FormaPago, FormaEntrega, CrearPedidoDto } from '../../types'
 import DireccionAutocomplete from '../../components/DireccionAutocomplete'
 import CuponInput, { type CuponAplicado } from '../../components/client/CuponInput'
 
+const SERIF = "'Fraunces', Georgia, serif"
+
 const LABEL_FORMA_PAGO: Record<FormaPago, string> = {
   Efectivo: 'Efectivo',
   Transferencia: 'Transferencia',
   Tarjeta: 'Mercado Pago',
+}
+
+const DESC_FORMA_PAGO: Record<FormaPago, string> = {
+  Efectivo: 'Pagás en efectivo',
+  Transferencia: 'Pagás por transferencia',
+  Tarjeta: 'Pagás online con Mercado Pago',
 }
 
 export default function CheckoutPage() {
@@ -188,30 +196,39 @@ export default function CheckoutPage() {
   }
 
   const inputCls =
-    'w-full border border-[#d0d0d0] px-3 py-3 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white transition-colors'
+    'w-full border border-[#1a1a1a] px-3 py-2.5 text-sm rounded-none outline-none bg-white text-[#1a1a1a] placeholder:text-[#6b6258] transition-shadow focus:ring-2 focus:ring-[#73223a] focus:ring-offset-0'
   const labelCls =
-    'block text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1.5'
+    'block text-xs text-[#6b6258] mb-1.5'
+  const eyebrowCls =
+    'block text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] mb-4'
 
   return (
-    <div className="min-h-screen bg-white text-[#1a1a1a] font-sans">
+    <div className="min-h-screen bg-[#faf8f4] text-[#1a1a1a]">
 
       {/* ── Header ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 bg-white border-b border-[#1a1a1a] h-14 flex items-center gap-4 px-4">
+      <header className="sticky top-0 z-30 bg-[#faf8f4]/95 backdrop-blur-sm border-b border-[#e8e1d4] h-14 flex items-center px-5">
         <button
           onClick={() => navigate(-1)}
           aria-label="Volver"
-          className="font-bold text-base leading-none"
+          className="text-xl leading-none text-[#1a1a1a] w-8 text-left shrink-0"
         >
           ←
         </button>
-        <h1 className="font-bold text-[15px]">Datos del pedido</h1>
+        <h1
+          className="flex-1 text-center px-2 text-[#1a1a1a]"
+          style={{ fontFamily: SERIF, fontSize: '19px', fontWeight: 400, letterSpacing: '0.01em' }}
+        >
+          Finalizar pedido
+        </h1>
+        <div className="w-8 shrink-0" />
       </header>
 
-      <form onSubmit={handleSubmit} className="px-4 py-6 space-y-6 pb-28">
+      <form onSubmit={handleSubmit} className="mx-auto w-full px-5 pt-7 pb-36" style={{ maxWidth: '560px' }}>
 
-        {/* Nombre */}
-        <div>
-          <label htmlFor="nombre" className={labelCls}>Tu nombre</label>
+        {/* ── TUS DATOS ──────────────────────────────────────────── */}
+        <p className={eyebrowCls}>Tus datos</p>
+        <div className="mb-4">
+          <label htmlFor="nombre" className={labelCls}>Nombre completo</label>
           <input
             id="nombre"
             type="text"
@@ -223,9 +240,7 @@ export default function CheckoutPage() {
             className={inputCls}
           />
         </div>
-
-        {/* Teléfono */}
-        <div>
+        <div className="mb-4">
           <label htmlFor="telefono" className={labelCls}>Teléfono</label>
           <input
             id="telefono"
@@ -239,30 +254,38 @@ export default function CheckoutPage() {
           />
         </div>
 
-        {/* Forma de entrega */}
-        <div>
-          <p className={labelCls}>Forma de entrega</p>
-          <div className="flex border border-[#1a1a1a]">
-            {(['Local', 'Delivery'] as FormaEntrega[]).map(opt => (
+        {/* ── ENTREGA ────────────────────────────────────────────── */}
+        <p className={`${eyebrowCls} mt-10`}>Entrega</p>
+        <div className="flex flex-col gap-2">
+          {(['Local', 'Delivery'] as FormaEntrega[]).map(opt => {
+            const selected = formaEntrega === opt
+            return (
               <button
                 key={opt}
                 type="button"
                 onClick={() => setFormaEntrega(opt)}
-                className={`flex-1 py-3 text-sm font-bold rounded-none transition-colors ${
-                  formaEntrega === opt
-                    ? 'bg-[#1a1a1a] text-white'
-                    : 'bg-white text-[#1a1a1a] hover:bg-[#f5f5f5]'
+                className={`text-left border border-[#1a1a1a] rounded-none px-4 py-3 transition-colors ${
+                  selected ? 'bg-[#1a1a1a] text-[#faf8f4]' : 'bg-white text-[#1a1a1a] hover:bg-[#ede5d3]/40'
                 }`}
               >
-                {opt === 'Local' ? 'Retiro en local' : 'Delivery'}
+                <p className="text-sm font-medium">
+                  {opt === 'Local' ? 'Retiro en local' : 'Delivery'}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: selected ? '#d4cbb8' : '#6b6258' }}>
+                  {opt === 'Local'
+                    ? 'Retirás en el local'
+                    : menu?.local.costoEnvio != null
+                      ? `Envío $${menu.local.costoEnvio.toLocaleString('es-AR')}`
+                      : 'Coordinás el envío'}
+                </p>
               </button>
-            ))}
-          </div>
+            )
+          })}
         </div>
 
         {/* Delivery fields */}
         {formaEntrega === 'Delivery' && (
-          <div className="space-y-4">
+          <div className="space-y-4 mt-4">
             <div>
               <label className={labelCls}>Dirección</label>
               <DireccionAutocomplete
@@ -277,7 +300,7 @@ export default function CheckoutPage() {
             {/* Tipo de edificación */}
             <div>
               <p className={labelCls}>Tipo de edificación</p>
-              <div className="border border-[#d0d0d0]">
+              <div className="border border-[#1a1a1a]">
                 {(
                   ['Casa', 'Barrio cerrado', 'Edificio / Condominio', 'Centro comercial / Local comercial', 'Otro'] as const
                 ).map((tipo, i) => (
@@ -285,8 +308,8 @@ export default function CheckoutPage() {
                     key={tipo}
                     onClick={() => tipoEdificacion !== tipo && setTipoEdificacion(tipo)}
                     className={`flex items-center justify-between px-3 py-3 text-sm cursor-pointer ${
-                      i < 4 ? 'border-b border-[#e8e8e8]' : ''
-                    } ${tipoEdificacion === tipo ? 'bg-[#f5f5f5]' : 'hover:bg-[#fafafa]'}`}
+                      i < 4 ? 'border-b border-[#e8e1d4]' : ''
+                    } ${tipoEdificacion === tipo ? 'bg-[#ede5d3]/50' : 'hover:bg-[#ede5d3]/25'}`}
                   >
                     <span className="flex items-center gap-2.5">
                       <span className="flex-shrink-0 w-4 h-4 border border-[#1a1a1a] flex items-center justify-center">
@@ -300,7 +323,7 @@ export default function CheckoutPage() {
                       <button
                         type="button"
                         onClick={e => { e.stopPropagation(); setTipoEdificacion('') }}
-                        className="text-sm text-[#aaa] hover:text-[#1a1a1a] ml-2 flex-shrink-0"
+                        className="text-sm text-[#6b6258] hover:text-[#1a1a1a] ml-2 flex-shrink-0"
                         aria-label="Cambiar tipo de edificación"
                       >
                         ✏
@@ -320,7 +343,7 @@ export default function CheckoutPage() {
                   onChange={e => setReferencia(e.target.value)}
                   placeholder="Ej: portón negro, timbre 2"
                   className={`${inputCls} resize-none`}
-                  rows={2}
+                  rows={3}
                 />
               </div>
             )}
@@ -355,7 +378,7 @@ export default function CheckoutPage() {
                     onChange={e => setReferencia(e.target.value)}
                     placeholder="Ej: frente al parque"
                     className={`${inputCls} resize-none`}
-                    rows={2}
+                    rows={3}
                   />
                 </div>
               </>
@@ -391,7 +414,7 @@ export default function CheckoutPage() {
                     onChange={e => setReferencia(e.target.value)}
                     placeholder="Ej: portón azul"
                     className={`${inputCls} resize-none`}
-                    rows={2}
+                    rows={3}
                   />
                 </div>
               </>
@@ -417,7 +440,7 @@ export default function CheckoutPage() {
                     onChange={e => setReferencia(e.target.value)}
                     placeholder="Ej: planta baja, frente a la escalera"
                     className={`${inputCls} resize-none`}
-                    rows={2}
+                    rows={3}
                   />
                 </div>
               </>
@@ -443,7 +466,7 @@ export default function CheckoutPage() {
                     onChange={e => setReferencia(e.target.value)}
                     placeholder="Ej: entrada principal"
                     className={`${inputCls} resize-none`}
-                    rows={2}
+                    rows={3}
                     required
                   />
                 </div>
@@ -454,36 +477,40 @@ export default function CheckoutPage() {
 
         {/* Retiro: local address */}
         {formaEntrega === 'Local' && menu?.local.direccion && (
-          <div className="bg-[#f5f5f5] px-4 py-4">
-            <p className={labelCls}>Dirección del local</p>
-            <p className="text-sm font-bold">{menu.local.direccion}</p>
+          <div className="mt-4 px-4 py-4" style={{ backgroundColor: '#ede5d3' }}>
+            <p className="text-[10px] font-medium uppercase text-[#6b6258] mb-1.5" style={{ letterSpacing: '0.2em' }}>
+              Dirección del local
+            </p>
+            <p className="text-sm text-[#1a1a1a]">{menu.local.direccion}</p>
           </div>
         )}
 
-        {/* Forma de pago */}
-        <div>
-          <p className={labelCls}>Forma de pago</p>
-          <div className="flex border border-[#1a1a1a]">
-            {opcionesFormaPago.map((opt, idx) => (
+        {/* ── PAGO ───────────────────────────────────────────────── */}
+        <p className={`${eyebrowCls} mt-10`}>Pago</p>
+        <div className="flex flex-col gap-2">
+          {opcionesFormaPago.map(opt => {
+            const selected = formaPago === opt
+            return (
               <button
                 key={opt}
                 type="button"
                 onClick={() => setFormaPago(opt)}
-                className={`flex-1 py-3 text-xs font-bold rounded-none transition-colors ${
-                  formaPago === opt
-                    ? 'bg-[#1a1a1a] text-white'
-                    : 'bg-white text-[#1a1a1a] hover:bg-[#f5f5f5]'
-                } ${idx < opcionesFormaPago.length - 1 ? 'border-r border-[#1a1a1a]' : ''}`}
+                className={`text-left border border-[#1a1a1a] rounded-none px-4 py-3 transition-colors ${
+                  selected ? 'bg-[#1a1a1a] text-[#faf8f4]' : 'bg-white text-[#1a1a1a] hover:bg-[#ede5d3]/40'
+                }`}
               >
-                {LABEL_FORMA_PAGO[opt]}
+                <p className="text-sm font-medium">{LABEL_FORMA_PAGO[opt]}</p>
+                <p className="text-xs mt-0.5" style={{ color: selected ? '#d4cbb8' : '#6b6258' }}>
+                  {DESC_FORMA_PAGO[opt]}
+                </p>
               </button>
-            ))}
-          </div>
+            )
+          })}
         </div>
 
         {/* Monto en efectivo */}
         {formaPago === 'Efectivo' && (
-          <div>
+          <div className="mt-4">
             <label htmlFor="monto" className={labelCls}>
               ¿Con cuánto pagás?
             </label>
@@ -499,95 +526,111 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {/* Order summary */}
-        <div className="border border-[#e8e8e8]">
-          <div className="px-4 py-3 border-b border-[#e8e8e8]">
-            <p className={labelCls}>Resumen del pedido</p>
-          </div>
+        {/* ── TU PEDIDO ──────────────────────────────────────────── */}
+        <p className={`${eyebrowCls} mt-10`}>Tu pedido</p>
 
-          {/* Items */}
-          <div className="px-4 py-3 space-y-2">
-            {items.map(item => {
-              const extrasTotal = item.extras.reduce((s, e) => s + e.precioAdicional, 0)
-              const precioUnitario = (item.producto.precioConDescuento ?? item.producto.precio ?? 0) + extrasTotal
-              return (
-                <div
-                  key={`${item.producto.id}-${item.extras.map(e => e.id).join(',')}${item.varianteId != null ? `:${item.varianteId}` : ''}`}
-                  className="flex justify-between text-sm"
-                >
-                  <span className="text-[#666]">
-                    {item.cantidad}× {item.producto.nombre}
-                    {(item.varianteDescripcion || item.extras.length > 0) && (
-                      <span className="text-[#aaa]">
-                        {' '}({[
-                          item.varianteDescripcion,
-                          item.extras.length > 0 ? item.extras.map(e => e.nombre).join(', ') : null,
-                        ].filter(Boolean).join(' · ')})
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-bold shrink-0 ml-3">
-                    ${(precioUnitario * item.cantidad).toLocaleString('es-AR')}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+        {/* Items */}
+        <div className="space-y-2">
+          {items.map(item => {
+            const extrasTotal = item.extras.reduce((s, e) => s + e.precioAdicional, 0)
+            const precioUnitario = (item.producto.precioConDescuento ?? item.producto.precio ?? 0) + extrasTotal
+            return (
+              <div
+                key={`${item.producto.id}-${item.extras.map(e => e.id).join(',')}${item.varianteId != null ? `:${item.varianteId}` : ''}`}
+                className="flex justify-between text-sm"
+              >
+                <span className="text-[#1a1a1a]">
+                  {item.cantidad} × {item.producto.nombre}
+                  {(item.varianteDescripcion || item.extras.length > 0) && (
+                    <span className="text-[#6b6258]">
+                      {' '}({[
+                        item.varianteDescripcion,
+                        item.extras.length > 0 ? item.extras.map(e => e.nombre).join(', ') : null,
+                      ].filter(Boolean).join(' · ')})
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono tabular-nums shrink-0 ml-3 text-[#1a1a1a]">
+                  ${(precioUnitario * item.cantidad).toLocaleString('es-AR')}
+                </span>
+              </div>
+            )
+          })}
+        </div>
 
-          {/* Coupon input */}
-          <div className="px-4 py-3 border-t border-[#e8e8e8]">
-            <CuponInput
-              slug={slug!}
-              subtotal={subtotalConDescuentos}
-              onCuponAplicado={setCuponAplicado}
-            />
-          </div>
+        {/* Coupon input */}
+        <div className="mt-5 pt-5 border-t border-[#e8e1d4]">
+          <p className={labelCls}>Cupón de descuento</p>
+          <CuponInput
+            slug={slug!}
+            subtotal={subtotalConDescuentos}
+            onCuponAplicado={setCuponAplicado}
+          />
+        </div>
 
-          {/* Totals breakdown */}
-          <div className="px-4 py-3 border-t border-[#e8e8e8] space-y-2 text-sm">
-            <div className="flex justify-between text-[#666]">
-              <span>Subtotal</span>
-              <span>${subtotalBase.toLocaleString('es-AR')}</span>
+        {/* Totals breakdown */}
+        <div className="mt-5 pt-5 border-t border-[#e8e1d4] space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-[#6b6258]">Subtotal</span>
+            <span className="font-mono tabular-nums text-[#1a1a1a]">${subtotalBase.toLocaleString('es-AR')}</span>
+          </div>
+          {descuentoProductos > 0 && (
+            <div className="flex justify-between">
+              <span className="text-[#6b6258]">Descuentos en productos</span>
+              <span className="font-mono tabular-nums" style={{ color: '#2d5a27' }}>
+                −${descuentoProductos.toLocaleString('es-AR')}
+              </span>
             </div>
-            {descuentoProductos > 0 && (
-              <div className="flex justify-between text-[#ef4444]">
-                <span>Descuentos en productos</span>
-                <span>-${descuentoProductos.toLocaleString('es-AR')}</span>
-              </div>
-            )}
-            {cuponAplicado && (
-              <div className="flex justify-between text-[#ef4444]">
-                <span>Cupón {cuponAplicado.codigo}</span>
-                <span>-${cuponAplicado.montoDescuento.toLocaleString('es-AR')}</span>
-              </div>
-            )}
-            {formaEntrega === 'Delivery' && menu?.local.costoEnvio != null && (
-              <div className="flex justify-between text-[#666]">
-                <span>Envío</span>
-                <span>${menu.local.costoEnvio.toLocaleString('es-AR')}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="px-4 py-3 border-t border-[#e8e8e8] flex justify-between font-bold text-base">
-            <span>Total</span>
-            <span>${totalFinal.toLocaleString('es-AR')}</span>
+          )}
+          {cuponAplicado && (
+            <div className="flex justify-between">
+              <span className="text-[#6b6258]">Cupón {cuponAplicado.codigo}</span>
+              <span className="font-mono tabular-nums" style={{ color: '#2d5a27' }}>
+                −${cuponAplicado.montoDescuento.toLocaleString('es-AR')}
+              </span>
+            </div>
+          )}
+          {formaEntrega === 'Delivery' && menu?.local.costoEnvio != null && (
+            <div className="flex justify-between">
+              <span className="text-[#6b6258]">Envío</span>
+              <span className="font-mono tabular-nums text-[#1a1a1a]">${menu.local.costoEnvio.toLocaleString('es-AR')}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-baseline mt-3 pt-3 border-t border-[#e8e1d4]">
+            <span className="text-sm text-[#1a1a1a]">Total</span>
+            <span className="text-base font-mono tabular-nums font-medium text-[#1a1a1a]">
+              ${totalFinal.toLocaleString('es-AR')}
+            </span>
           </div>
         </div>
 
         {error && (
-          <p className="text-sm text-red-600 text-center">{error}</p>
+          <div className="mt-8 p-3 border" style={{ backgroundColor: '#fef2f2', borderColor: '#a92020' }}>
+            <p className="text-sm" style={{ color: '#a92020' }}>{error}</p>
+          </div>
         )}
 
-        {/* ── Submit — fixed, inside form ───────────────────────── */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="fixed bottom-0 left-0 right-0 z-20 bg-[#1a1a1a] text-white py-4 font-bold text-sm rounded-none disabled:opacity-50 flex items-center justify-between px-4"
-        >
-          <span>{loading ? 'Enviando pedido…' : 'Confirmar pedido'}</span>
-          {!loading && <span>→</span>}
-        </button>
+        {/* ── CTA fixed — submit dentro del form ─────────────────── */}
+        <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#e8e1d4]">
+          <div className="mx-auto flex items-center justify-between gap-4 px-5 py-3" style={{ maxWidth: '560px' }}>
+            <div className="flex flex-col leading-none">
+              <span className="text-[10px] font-medium text-[#6b6258] uppercase mb-1" style={{ letterSpacing: '0.2em' }}>
+                Total
+              </span>
+              <span className="font-mono tabular-nums font-bold text-[17px] text-[#1a1a1a]">
+                ${totalFinal.toLocaleString('es-AR')}
+              </span>
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-3 text-[12px] font-medium uppercase rounded-none text-[#faf8f4] bg-[#73223a] hover:bg-[#651d33] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              style={{ letterSpacing: '0.15em' }}
+            >
+              {loading ? 'Procesando…' : formaPago === 'Tarjeta' ? 'Ir al pago' : 'Confirmar pedido'}
+            </button>
+          </div>
+        </div>
       </form>
     </div>
   )

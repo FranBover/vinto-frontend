@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 
+import LandingPage from './pages/marketing/LandingPage'
 import MenuPage from './pages/client/MenuPage'
 import ProductosPage from './pages/client/ProductosPage'
 import ExtrasPage from './pages/client/ExtrasPage'
@@ -31,6 +32,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* ── Marketing ────────────────────────────────────────── */}
+        <Route path="/" element={<LandingPage />} />
+
         {/* ── Cliente ──────────────────────────────────────────── */}
         <Route path="/:slug" element={<MenuPage />} />
         <Route path="/:slug/productos/:categoriaId" element={<ProductosPage />} />

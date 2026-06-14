@@ -4,6 +4,8 @@ import { useCartStore } from '../../store/cartStore'
 import { consultarEstadoPago } from '../../api/mercadoPagoApi'
 import type { EstadoPagoPublicoResponse } from '../../types'
 
+const SERIF = "'Fraunces', Georgia, serif"
+
 const MENSAJE_PENDING_EXTRA =
   '\n\n⏳ Estoy esperando la confirmación del pago por Mercado Pago. Te aviso apenas se confirme.'
 
@@ -25,6 +27,7 @@ export default function PagoPendingPage() {
   const [data, setData] = useState<EstadoPagoPublicoResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [showResumen, setShowResumen] = useState(false)
 
   // Vaciar carrito al cargar (igual que ConfirmacionPage)
   useEffect(() => {
@@ -52,22 +55,42 @@ export default function PagoPendingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white text-[#1a1a1a] font-sans flex flex-col items-center justify-center px-8">
-        <p className="text-sm text-[#999]">Cargando…</p>
+      <div className="min-h-screen bg-[#faf8f4] flex items-center justify-center px-8">
+        <p className="text-sm text-[#6b6258]" style={{ fontFamily: SERIF, fontStyle: 'italic' }}>
+          Cargando…
+        </p>
       </div>
     )
   }
 
   if (notFound || !data) {
     return (
-      <div className="min-h-screen bg-white text-[#1a1a1a] font-sans flex flex-col items-center justify-center px-8 gap-6">
-        <p className="font-bold text-lg text-center">Pedido no encontrado</p>
-        <button
-          onClick={() => navigate(`/${slug}`)}
-          className="bg-[#1a1a1a] text-white px-6 py-3 font-bold text-sm rounded-none"
-        >
-          Volver al menú
-        </button>
+      <div className="min-h-screen bg-[#faf8f4] text-[#1a1a1a]">
+        <div className="mx-auto px-6 pt-16 pb-32" style={{ maxWidth: '480px' }}>
+          <p className="text-[11px] font-medium uppercase tracking-[0.22em] mb-5 text-center" style={{ color: '#6b6258' }}>
+            Pedido no encontrado
+          </p>
+          <div className="mx-auto mb-6" style={{ width: '32px', height: '1.5px', backgroundColor: '#6b6258' }} />
+          <h1
+            className="leading-tight text-center mb-4 text-[#1a1a1a]"
+            style={{ fontFamily: SERIF, fontSize: '34px', fontWeight: 400, letterSpacing: '0.01em' }}
+          >
+            No pudimos encontrar tu pedido
+          </h1>
+          <p className="text-[15px] text-[#6b6258] text-center mx-auto" style={{ maxWidth: '380px', lineHeight: 1.6 }}>
+            No pudimos encontrar el pedido. Si pensás que es un error, contactá al local.
+          </p>
+        </div>
+        <footer className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#e8e1d4]">
+          <div className="mx-auto px-5 py-4" style={{ maxWidth: '560px' }}>
+            <button
+              onClick={() => navigate(`/${slug}`)}
+              className="block w-full text-center bg-[#73223a] hover:bg-[#651d33] text-[#faf8f4] py-3.5 text-[11px] font-medium uppercase tracking-[0.18em] rounded-none transition-colors"
+            >
+              Volver al menú
+            </button>
+          </div>
+        </footer>
       </div>
     )
   }
@@ -78,72 +101,97 @@ export default function PagoPendingPage() {
     ? `https://wa.me/${waNumber}?text=${encodeURIComponent(textoWhatsApp)}`
     : null
 
+  const rows: { label: string; value: string; mono?: boolean }[] = [
+    ...(data.nombreCliente ? [{ label: 'Nombre', value: data.nombreCliente }] : []),
+    ...(data.total != null ? [{ label: 'Total', value: `$${data.total.toLocaleString('es-AR')}`, mono: true }] : []),
+  ]
+
   return (
-    <div className="min-h-screen bg-white text-[#1a1a1a] font-sans pb-10">
-      <header className="border-b border-[#1a1a1a] h-14 flex items-center px-4">
-        <h1 className="font-bold text-[15px]">Pago pendiente</h1>
-      </header>
+    <div className="min-h-screen bg-[#faf8f4] text-[#1a1a1a]">
+      <div className="mx-auto px-6 pt-16 pb-32" style={{ maxWidth: '480px' }}>
 
-      <div className="bg-[#fff8e1] text-[#7d5e00] px-4 py-3 border-b border-[#f0e0a0]">
-        <p className="text-[11px] font-bold uppercase tracking-widest">Estado</p>
-        <p className="font-bold text-base mt-0.5">Tu pago se está procesando</p>
-      </div>
-
-      <div className="px-4 py-6 space-y-5">
-        {data.nombreCliente && (
-          <div>
-            <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-1">
-              Nombre
-            </p>
-            <p className="font-bold text-base">{data.nombreCliente}</p>
-          </div>
-        )}
-
-        {data.total != null && (
-          <div className="border-t border-[#e8e8e8] pt-5 flex items-center justify-between">
-            <p className="font-bold text-base">Total</p>
-            <p className="font-bold text-2xl">${data.total.toLocaleString('es-AR')}</p>
-          </div>
-        )}
-      </div>
-
-      {data.resumenWhatsApp && (
-        <div className="px-4 pb-6">
-          <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-2">
-            Resumen
-          </p>
-          <pre className="text-xs text-[#444] whitespace-pre-wrap font-sans leading-relaxed bg-[#f5f5f5] px-4 py-4 overflow-auto">
-            {data.resumenWhatsApp}
-          </pre>
-        </div>
-      )}
-
-      <div className="px-4 pt-2 pb-8 space-y-4">
-        <p className="text-sm text-[#666] leading-relaxed">
+        <p className="text-[11px] font-medium uppercase tracking-[0.22em] mb-5 text-center" style={{ color: '#6b6258' }}>
+          Pago en proceso
+        </p>
+        <div className="mx-auto mb-6" style={{ width: '32px', height: '1.5px', backgroundColor: '#6b6258' }} />
+        <h1
+          className="leading-tight text-center mb-4 text-[#1a1a1a]"
+          style={{ fontFamily: SERIF, fontSize: '34px', fontWeight: 400, letterSpacing: '0.01em' }}
+        >
+          Tu pago está pendiente
+        </h1>
+        <p className="text-[15px] text-[#6b6258] text-center mx-auto mb-10" style={{ maxWidth: '380px', lineHeight: 1.6 }}>
           Mercado Pago todavía no confirmó tu pago (algunos medios como Rapipago o transferencia tardan más). Avisanos por WhatsApp cuando tengas el comprobante.
         </p>
-        {waLink ? (
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2.5 w-full bg-[#1a1a1a] text-white py-4 font-bold text-sm rounded-none"
-          >
-            <span className="w-2 h-2 rounded-full bg-[#2d5a27] shrink-0" />
-            Confirmar por WhatsApp
-          </a>
-        ) : (
-          <div className="w-full bg-[#e8e8e8] text-[#999] py-4 font-bold text-sm text-center">
-            WhatsApp no disponible
+
+        {rows.length > 0 && (
+          <div className="mx-auto mb-8" style={{ maxWidth: '360px' }}>
+            {rows.map((r, i) => (
+              <div key={i} className="py-3 border-b border-[#e8e1d4] last:border-b-0">
+                <p className="text-[10px] font-medium uppercase text-[#6b6258] mb-1" style={{ letterSpacing: '0.18em' }}>
+                  {r.label}
+                </p>
+                <p className={`text-[15px] text-[#1a1a1a] ${r.mono ? 'font-mono tabular-nums' : ''}`}>
+                  {r.value}
+                </p>
+              </div>
+            ))}
           </div>
         )}
-        <button
-          onClick={() => navigate(`/${slug}`)}
-          className="w-full border border-[#e8e8e8] text-[#1a1a1a] py-3.5 text-sm font-bold rounded-none"
-        >
-          Volver al menú
-        </button>
+
+        {data.resumenWhatsApp && (
+          <div className="mx-auto" style={{ maxWidth: '360px' }}>
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] mb-2">
+              Resumen del pedido
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowResumen(v => !v)}
+              className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] hover:text-[#73223a] underline underline-offset-4 decoration-1 decoration-[#e8e1d4] hover:decoration-[#73223a] transition-colors"
+            >
+              {showResumen ? 'Ocultar detalle' : 'Ver detalle'}
+            </button>
+            {showResumen && (
+              <pre
+                className="mt-3 text-xs whitespace-pre-wrap font-sans leading-relaxed px-4 py-4 overflow-auto text-[#1a1a1a]"
+                style={{ backgroundColor: '#ede5d3' }}
+              >
+                {data.resumenWhatsApp}
+              </pre>
+            )}
+          </div>
+        )}
       </div>
+
+      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#e8e1d4]">
+        <div className="mx-auto px-5 py-4" style={{ maxWidth: '560px' }}>
+          {waLink ? (
+            <>
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center bg-[#73223a] hover:bg-[#651d33] text-[#faf8f4] py-3.5 text-[11px] font-medium uppercase tracking-[0.18em] rounded-none transition-colors"
+              >
+                Confirmar por WhatsApp
+              </a>
+              <button
+                onClick={() => navigate(`/${slug}`)}
+                className="block mx-auto mt-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] hover:text-[#73223a] transition-colors"
+              >
+                Volver al menú
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => navigate(`/${slug}`)}
+              className="block w-full text-center bg-[#73223a] hover:bg-[#651d33] text-[#faf8f4] py-3.5 text-[11px] font-medium uppercase tracking-[0.18em] rounded-none transition-colors"
+            >
+              Volver al menú
+            </button>
+          )}
+        </div>
+      </footer>
     </div>
   )
 }

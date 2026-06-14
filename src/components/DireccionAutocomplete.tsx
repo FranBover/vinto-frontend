@@ -14,6 +14,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 })
 
+const SERIF = "'Fraunces', Georgia, serif"
+
 interface NominatimResult {
   place_id: number
   display_name: string
@@ -131,29 +133,36 @@ export default function DireccionAutocomplete({ value, onChange, inputClassName,
       />
 
       {showDropdown && (
-        <ul className="absolute z-50 w-full bg-white border border-[#d0d0d0] mt-[-1px] max-h-60 overflow-y-auto text-sm shadow-sm">
-          {suggestions.map(r => (
-            <li
-              key={r.place_id}
-              onMouseDown={() => handleSelect(r)}
-              className="px-3 py-2.5 hover:bg-[#f5f5f5] cursor-pointer border-b border-[#f0f0f0] last:border-0 leading-snug"
-            >
-              {r.display_name}
-            </li>
-          ))}
+        <ul className="absolute z-50 w-full bg-white border border-[#1a1a1a] mt-[-1px] max-h-60 overflow-y-auto">
+          {suggestions.map(r => {
+            const [primary, ...rest] = r.display_name.split(',')
+            const secondary = rest.join(',').trim()
+            return (
+              <li
+                key={r.place_id}
+                onMouseDown={() => handleSelect(r)}
+                className="px-3 py-2.5 cursor-pointer border-b border-[#e8e1d4] last:border-0 hover:bg-[#ede5d3] transition-colors"
+              >
+                <span className="block text-sm text-[#1a1a1a] leading-snug">{primary.trim()}</span>
+                {secondary && (
+                  <span className="block text-xs text-[#6b6258] leading-snug mt-0.5">{secondary}</span>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
 
       <button
         type="button"
         onMouseDown={() => setShowMapPicker(true)}
-        className="mt-2 text-xs text-[#2d5a27] underline underline-offset-2 hover:text-[#1a1a1a] transition-colors"
+        className="mt-2 text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] hover:text-[#73223a] underline underline-offset-4 decoration-1 decoration-[#e8e1d4] hover:decoration-[#73223a] transition-colors"
       >
-        No encuentro mi dirección, elegir en el mapa
+        Elegir en el mapa
       </button>
 
       {pin && (
-        <div className="mt-2 border border-[#d0d0d0]" style={{ height: '192px' }}>
+        <div className="mt-2 border border-[#e8e1d4]" style={{ height: '192px' }}>
           <MapContainer
             center={[pin.lat, pin.lon]}
             zoom={16}
@@ -174,16 +183,22 @@ export default function DireccionAutocomplete({ value, onChange, inputClassName,
       {showMapPicker && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col" style={{ touchAction: 'none' }}>
           {/* Header */}
-          <div className="flex items-center justify-between px-4 border-b border-[#1a1a1a] flex-shrink-0" style={{ height: '56px' }}>
-            <h2 className="font-bold text-[15px]">Mover el mapa a tu ubicación</h2>
+          <div className="flex items-center justify-between px-5 border-b border-[#e8e1d4] flex-shrink-0 bg-[#faf8f4]" style={{ height: '56px' }}>
             <button
               type="button"
               onClick={() => setShowMapPicker(false)}
-              className="text-lg leading-none font-bold"
+              className="text-[13px] text-[#1a1a1a] w-20 text-left shrink-0"
               aria-label="Cerrar"
             >
-              ✕
+              Cerrar
             </button>
+            <h2
+              className="flex-1 text-center px-2 text-[#1a1a1a]"
+              style={{ fontFamily: SERIF, fontSize: '19px', fontWeight: 400, letterSpacing: '0.01em' }}
+            >
+              Elegir ubicación
+            </h2>
+            <div className="w-20 shrink-0" />
           </div>
 
           {/* Map area */}
@@ -222,13 +237,12 @@ export default function DireccionAutocomplete({ value, onChange, inputClassName,
           </div>
 
           {/* Bottom bar */}
-          <div className="flex-shrink-0 p-4 border-t border-[#e8e8e8]">
+          <div className="flex-shrink-0 bg-white border-t border-[#e8e1d4] px-5 py-3">
             <button
               type="button"
               onClick={handlePickerConfirm}
               disabled={pickerLoading}
-              className="w-full text-white py-4 font-bold text-sm rounded-none disabled:opacity-60"
-              style={{ backgroundColor: '#2d5a27' }}
+              className="w-full py-3 px-5 text-[11px] font-medium uppercase tracking-[0.18em] rounded-none text-[#faf8f4] bg-[#73223a] hover:bg-[#651d33] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {pickerLoading ? 'Buscando dirección…' : 'Confirmar ubicación'}
             </button>

@@ -33,6 +33,19 @@ export interface Administrador {
 export interface Categoria {
   id: number
   nombre: string
+  orden: number
+  imagenUrl: string | null
+}
+
+export interface CategoriaCreateDTO {
+  nombre: string
+  orden?: number
+  administradorId: number
+}
+
+export interface CategoriaUpdateDTO {
+  nombre: string
+  orden?: number
   administradorId: number
 }
 
@@ -262,6 +275,8 @@ export interface LocalPublico {
 export interface CategoriaPublica {
   id: number
   nombre: string
+  orden: number
+  imagenUrl: string | null
   productos: Producto[]
 }
 
@@ -310,4 +325,83 @@ export interface MercadoPagoDiagnosticoResponse {
   conectado: boolean
   tokenExpirado: boolean
   pedidosPendientesConMP: number
+}
+
+// ── Reportes ─────────────────────────────────────────────────────────────────
+
+export type Periodo = 'hoy' | 'semana' | 'mes' | 'anio'
+
+export interface RangoFechas {
+  desde: string
+  hasta: string
+  label: string
+}
+
+export interface VentasResumen {
+  total: number
+  totalAnterior: number
+  variacionPorcentual: number | null
+  cantidadPedidos: number
+  cantidadPedidosAnterior: number
+  variacionPedidos: number | null
+  ticketPromedio: number
+  ticketPromedioAnterior: number
+  variacionTicket: number | null
+}
+
+export interface PuntoSerie {
+  etiqueta: string
+  total: number
+  cantidad: number
+}
+
+export interface TopProducto {
+  productoId: number
+  nombre: string
+  unidades: number
+  facturacion: number
+}
+
+export interface TopCategoria {
+  categoriaId: number
+  nombre: string
+  unidades: number
+  facturacion: number
+}
+
+export interface TopCliente {
+  nombreCliente: string
+  telefono: string
+  cantidadPedidos: number
+  total: number
+}
+
+export interface MetodoPago {
+  formaPago: string
+  cantidad: number
+  monto: number
+  porcentaje: number
+}
+
+export interface HoraPico {
+  hora: number
+  cantidad: number
+}
+
+export interface DiaPico {
+  diaSemana: number
+  cantidad: number
+}
+
+export interface DashboardReporte {
+  periodo: RangoFechas
+  comparacion: RangoFechas
+  ventas: VentasResumen
+  serieVentas: PuntoSerie[]
+  topProductos: TopProducto[]
+  topCategorias: TopCategoria[]
+  topClientes: TopCliente[]
+  metodosPago: MetodoPago[]
+  horasPico: HoraPico[]
+  diasPico: DiaPico[]
 }

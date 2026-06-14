@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "PowerShell(Get-ChildItem node_modules/recharts -Depth 1 | Select-Object Name; $p = Get-Content node_modules/recharts/package.json | ConvertFrom-Json; Write-Output \"type: $\\($p.type\\)\"; Write-Output \"module: $\\($p.module\\)\")",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Get-ChildItem *)"
     ]
   }
 }

@@ -5,6 +5,8 @@ import { useCartStore } from '../../store/cartStore'
 import type { Producto, ProductoExtra, TipoVarianteMenu, VarianteMenu } from '../../types'
 import { BASE_URL } from '../../config'
 
+const SERIF = "'Fraunces', Georgia, serif"
+
 function resolveImages(producto: Producto): string[] {
   if (producto.imagenes && producto.imagenes.length > 0) {
     return producto.imagenes
@@ -57,10 +59,6 @@ function getPrecioFinal(v: VarianteMenu): number {
   return v.precioConDescuento ?? v.precio
 }
 
-function tieneDescuento(v: VarianteMenu): boolean {
-  return v.precioConDescuento != null && v.precioConDescuento < v.precio
-}
-
 export default function ExtrasPage() {
   const { slug, categoriaId, productoId } = useParams<{
     slug: string
@@ -68,7 +66,7 @@ export default function ExtrasPage() {
     productoId: string
   }>()
   const navigate = useNavigate()
-  const { data, fetchMenu } = useMenuStore()
+  const { data, loading, fetchMenu } = useMenuStore()
   const agregarItem = useCartStore(s => s.agregarItem)
 
   const [selectedExtras, setSelectedExtras] = useState<ProductoExtra[]>([])
@@ -86,10 +84,28 @@ export default function ExtrasPage() {
   const producto = menu?.categorias.flatMap(c => c.productos).find(p => p.id === prodId)
   const isOpen = menu?.local.esActivo ?? true
 
+  if (loading && !producto) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#faf8f4]">
+        <p
+          className="text-sm text-[#6b6258]"
+          style={{ fontFamily: SERIF, fontStyle: 'italic' }}
+        >
+          Cargando…
+        </p>
+      </div>
+    )
+  }
+
   if (!menu || !producto) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <p className="text-sm text-[#999]">Producto no encontrado.</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#faf8f4] px-8">
+        <p
+          className="text-base text-[#1a1a1a] text-center"
+          style={{ fontFamily: SERIF }}
+        >
+          Producto no encontrado.
+        </p>
       </div>
     )
   }
@@ -117,14 +133,6 @@ export default function ExtrasPage() {
     }
   }, [varianteActiva?.id])
 
-  const variantesDisponibles = variantesMenu.filter(isVarianteAvailable)
-  const minPrecioFinalVariantes = variantesDisponibles.length > 0
-    ? Math.min(...variantesDisponibles.map(v => getPrecioFinal(v)))
-    : 0
-  const minPrecioBaseVariantes = variantesDisponibles.length > 0
-    ? Math.min(...variantesDisponibles.map(v => v.precio))
-    : 0
-
   function handleSelectOpcion(tipoId: number, opcionId: number, tipoIndex: number) {
     setSelectedOpciones(prev => {
       if (prev[tipoId] === opcionId) {
@@ -151,7 +159,7 @@ export default function ExtrasPage() {
   const extrasTotal = selectedExtras.reduce((s, e) => s + e.precioAdicional, 0)
   const basePrecio = tieneVariantes
     ? (varianteActiva != null ? getPrecioFinal(varianteActiva) : 0)
-    : (producto.precio ?? 0)
+    : (producto.precioConDescuento ?? producto.precio ?? 0)
   const precioUnitario = basePrecio + extrasTotal
   const totalItem = precioUnitario * cantidad
 
@@ -182,39 +190,46 @@ export default function ExtrasPage() {
     navigate(`/${slug}/productos/${categoriaId}`)
   }
 
+  // ── Presentational helpers (no behavior) ────────────────────────────────────
+  const prodHasDiscount = !tieneVariantes
+    && producto.precioConDescuento != null
+    && producto.precioConDescuento < (producto.precio ?? 0)
+
   return (
-    <div className="min-h-screen bg-white text-[#1a1a1a] font-sans flex flex-col">
+    <div className="min-h-screen bg-[#faf8f4] text-[#1a1a1a]">
 
       {/* ── Header ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 bg-white border-b border-[#1a1a1a] h-14 flex items-center gap-4 px-4">
+      <header className="sticky top-0 z-30 bg-[#faf8f4]/95 backdrop-blur-sm border-b border-[#e8e1d4] h-14 flex items-center px-5">
         <button
           onClick={() => navigate(-1)}
           aria-label="Volver"
-          className="font-bold text-base leading-none"
+          className="text-xl leading-none text-[#1a1a1a] w-8 text-left shrink-0"
         >
           ←
         </button>
-        <h1 className="font-bold text-[15px] flex-1 truncate">{producto.nombre}</h1>
+        <h1
+          className="flex-1 text-center truncate px-2 text-[#1a1a1a]"
+          style={{ fontFamily: SERIF, fontSize: '19px', fontWeight: 400, letterSpacing: '0.01em' }}
+        >
+          {producto.nombre}
+        </h1>
+        <div className="w-8 shrink-0" />
       </header>
 
-      {/* ── Scrollable content ─────────────────────────────────── */}
-      <div className="flex-1 overflow-auto pb-24">
+      {/* ── Centered content wrapper ───────────────────────────── */}
+      <div className="mx-auto w-full pb-32" style={{ maxWidth: '560px' }}>
 
-        {/* Hero / Carousel */}
+        {/* ── Hero / Carousel ──────────────────────────────────── */}
         <div
-          className="product-hero relative w-full bg-[#f5f5f5] overflow-hidden"
-          style={{ height: 260 }}
+          className="relative w-full bg-[#ede5d3] overflow-hidden"
+          style={{ aspectRatio: '3 / 2' }}
         >
           {images.length === 0 ? (
-            <div className="w-full h-full flex items-center justify-center">
-              <span className="text-6xl select-none" role="img" aria-label="Plato">🍽️</span>
-            </div>
+            <div className="w-full h-full" />
           ) : (
             <>
               {imgErrors[activeIndex] ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-6xl select-none" role="img" aria-label="Plato">🍽️</span>
-                </div>
+                <div className="w-full h-full" />
               ) : (
                 <img
                   key={activeIndex}
@@ -230,7 +245,7 @@ export default function ExtrasPage() {
                   <button
                     onClick={() => setImgIndex(i => (i - 1 + images.length) % images.length)}
                     aria-label="Anterior"
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 text-white flex items-center justify-center"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-[#faf8f4]/85 backdrop-blur-sm text-[#1a1a1a] flex items-center justify-center text-lg leading-none"
                     style={{ borderRadius: 0 }}
                   >
                     ‹
@@ -238,7 +253,7 @@ export default function ExtrasPage() {
                   <button
                     onClick={() => setImgIndex(i => (i + 1) % images.length)}
                     aria-label="Siguiente"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 text-white flex items-center justify-center"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-[#faf8f4]/85 backdrop-blur-sm text-[#1a1a1a] flex items-center justify-center text-lg leading-none"
                     style={{ borderRadius: 0 }}
                   >
                     ›
@@ -247,14 +262,14 @@ export default function ExtrasPage() {
               )}
 
               {canNavigate && (
-                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+                <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
                   {images.map((_, i) => (
                     <button
                       key={i}
                       onClick={() => setImgIndex(i)}
                       aria-label={`Imagen ${i + 1}`}
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: i === activeIndex ? '#1a1a1a' : '#ccc' }}
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: i === activeIndex ? '#1a1a1a' : '#c9bfae' }}
                     />
                   ))}
                 </div>
@@ -263,64 +278,51 @@ export default function ExtrasPage() {
           )}
         </div>
 
-        <style>{`@media (min-width: 768px) { .product-hero { height: 380px !important; } }`}</style>
-
-        {/* Product info */}
-        <div className="px-4 py-5 border-b border-[#e8e8e8]">
-          <h2 className="font-bold text-xl leading-tight">{producto.nombre}</h2>
+        {/* ── Product info ─────────────────────────────────────── */}
+        <div className="px-6 pt-7 pb-5 border-b border-[#e8e1d4]">
+          <h2
+            className="leading-tight text-[#1a1a1a]"
+            style={{ fontFamily: SERIF, fontSize: '27px', fontWeight: 400, letterSpacing: '0.01em' }}
+          >
+            {producto.nombre}
+          </h2>
           {producto.descripcion && (
-            <p className="text-sm text-[#666] mt-1.5 leading-relaxed">
+            <p className="text-[14px] text-[#6b6258] mt-2 leading-relaxed">
               {producto.descripcion}
             </p>
           )}
-          {tieneVariantes ? (
-            varianteActiva ? (
-              tieneDescuento(varianteActiva) ? (
-                <div className="flex items-center gap-2 mt-3 flex-wrap">
-                  <span className="font-bold text-base text-[#ef4444]">
-                    ${varianteActiva.precioConDescuento!.toLocaleString('es-AR')}
-                  </span>
-                  <span className="text-sm text-[#9ca3af] line-through">
-                    ${varianteActiva.precio.toLocaleString('es-AR')}
-                  </span>
-                  <span className="bg-[#ef4444] text-white text-[9px] font-bold leading-none px-1 py-0.5">
-                    -{varianteActiva.porcentajeDescuentoTotal}%
-                  </span>
-                </div>
-              ) : (
-                <p className="font-bold text-base mt-3">
-                  ${varianteActiva.precio.toLocaleString('es-AR')}
-                </p>
-              )
-            ) : variantesDisponibles.length > 0 ? (
-              minPrecioFinalVariantes < minPrecioBaseVariantes ? (
-                <div className="flex items-center gap-2 mt-3 flex-wrap">
-                  <span className="font-bold text-base text-[#ef4444]">
-                    Desde ${minPrecioFinalVariantes.toLocaleString('es-AR')}
-                  </span>
-                  <span className="text-sm text-[#9ca3af] line-through">
-                    ${minPrecioBaseVariantes.toLocaleString('es-AR')}
-                  </span>
-                </div>
-              ) : (
-                <p className="font-bold text-base mt-3">
-                  Desde ${minPrecioFinalVariantes.toLocaleString('es-AR')}
-                </p>
-              )
+
+          {/* Precio: solo para productos SIN variantes (con variantes el precio
+              aparece dinámicamente en el CTA según la opción elegida) */}
+          {!tieneVariantes && (
+            prodHasDiscount ? (
+              <div className="mt-4 flex items-baseline gap-2.5">
+                <span
+                  className="font-mono tabular-nums font-bold"
+                  style={{ color: '#73223a', fontSize: '22px' }}
+                >
+                  ${producto.precioConDescuento!.toLocaleString('es-AR')}
+                </span>
+                <span className="font-mono tabular-nums text-[13px] text-[#6b6258] line-through">
+                  ${(producto.precio ?? 0).toLocaleString('es-AR')}
+                </span>
+              </div>
             ) : (
-              <p className="font-bold text-sm mt-3 text-[#999]">Agotado</p>
+              <p className="mt-4 font-mono tabular-nums font-medium text-[#1a1a1a]" style={{ fontSize: '22px' }}>
+                ${(producto.precio ?? 0).toLocaleString('es-AR')}
+              </p>
             )
-          ) : (
-            <p className="font-bold text-base mt-3">
-              ${(producto.precio ?? 0).toLocaleString('es-AR')}
-            </p>
           )}
+
+          {/* Avisos de stock de la variante activa (feedback de comportamiento) */}
           {tieneVariantes && varianteActiva && !isVarianteAvailable(varianteActiva) && (
-            <p className="text-sm font-bold mt-1" style={{ color: '#dc2626' }}>Agotado</p>
+            <p className="text-[13px] mt-3" style={{ color: '#a92020', fontStyle: 'italic' }}>
+              Agotado
+            </p>
           )}
           {tieneVariantes && varianteActiva && isVarianteAvailable(varianteActiva) &&
             varianteActiva.stock !== null && varianteActiva.stock <= 3 && (
-            <p className="text-xs mt-1" style={{ color: '#a16207' }}>
+            <p className="text-[12px] mt-2" style={{ color: '#a16207' }}>
               Últimas {varianteActiva.stock} unidades
             </p>
           )}
@@ -328,13 +330,13 @@ export default function ExtrasPage() {
 
         {/* ── Variantes ──────────────────────────────────────────── */}
         {tieneVariantes && tiposSorted.length > 0 && (
-          <>
+          <div className="px-6 py-6 border-b border-[#e8e1d4]">
             {tiposSorted.map((tipo, tipoIndex) => {
               const opcionesSorted = [...tipo.opciones].sort((a, b) => a.orden - b.orden)
               const tipo1Selection = tipo1 ? selectedOpciones[tipo1.id] : undefined
               return (
-                <div key={tipo.id} className="px-4 py-4 border-b border-[#e8e8e8]">
-                  <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest mb-3">
+                <div key={tipo.id} className="mb-6 last:mb-0">
+                  <p className="text-[10px] font-medium text-[#6b6258] uppercase mb-3" style={{ letterSpacing: '0.2em' }}>
                     {tipo.nombre}
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -347,18 +349,15 @@ export default function ExtrasPage() {
                           type="button"
                           disabled={!available}
                           onClick={() => handleSelectOpcion(tipo.id, opcion.id, tipoIndex)}
-                          className={`px-3 py-1.5 text-sm font-medium transition-colors rounded-none ${
+                          className={`px-4 py-2.5 text-[13px] font-medium rounded-none border transition-colors ${
                             !available
-                              ? 'bg-[#e0e0e0] text-[#999] cursor-not-allowed'
+                              ? 'border-[#e8e1d4] text-[#6b6258] opacity-30 cursor-not-allowed bg-[#faf8f4]'
                               : isSelected
-                                ? 'text-white'
-                                : 'bg-[#f0f0f0] text-[#1a1a1a]'
+                                ? 'bg-[#1a1a1a] text-[#faf8f4] border-[#1a1a1a]'
+                                : 'bg-white text-[#1a1a1a] border-[#1a1a1a] hover:bg-[#ede5d3]/30'
                           }`}
-                          style={isSelected && available ? { backgroundColor: '#2d5a27' } : undefined}
                         >
-                          {!available
-                            ? <s>{opcion.valor}</s>
-                            : opcion.valor}
+                          {!available ? <s>{opcion.valor}</s> : opcion.valor}
                         </button>
                       )
                     })}
@@ -366,91 +365,124 @@ export default function ExtrasPage() {
                 </div>
               )
             })}
-          </>
+          </div>
         )}
 
-        {/* Extras */}
+        {/* ── Extras ─────────────────────────────────────────────── */}
         {producto.extras.length > 0 && (
-          <>
-            <div className="px-4 py-3 border-b border-[#e8e8e8]">
-              <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest">
-                Extras
-              </p>
-            </div>
+          <div className="px-6 py-6 border-b border-[#e8e1d4]">
+            <p className="text-[10px] font-medium text-[#6b6258] uppercase mb-4" style={{ letterSpacing: '0.2em' }}>
+              Extras · Opcional
+            </p>
             <ul>
-              {producto.extras.map(extra => {
+              {producto.extras.map((extra, idx) => {
                 const checked = selectedExtras.some(e => e.id === extra.id)
+                const isLast = idx === producto.extras.length - 1
                 return (
                   <li key={extra.id}>
-                    <label className="flex items-center justify-between px-4 py-4 border-b border-[#e8e8e8] cursor-pointer hover:bg-[#f9f9f9]">
-                      <div className="flex items-center gap-3">
+                    <label
+                      className={`flex items-center justify-between py-3 cursor-pointer ${
+                        isLast ? '' : 'border-b border-[#e8e1d4]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleExtra(extra)}
-                          className="w-5 h-5 accent-[#2d5a27]"
+                          className="sr-only"
                         />
-                        <span className="text-sm font-medium">{extra.nombre}</span>
+                        <span
+                          className="w-[18px] h-[18px] shrink-0 flex items-center justify-center"
+                          style={{
+                            border: '1.5px solid #1a1a1a',
+                            backgroundColor: checked ? '#1a1a1a' : '#ffffff',
+                          }}
+                        >
+                          {checked && (
+                            <span className="block w-[7px] h-[7px]" style={{ backgroundColor: '#faf8f4' }} />
+                          )}
+                        </span>
+                        <span className="text-[14px] text-[#1a1a1a] truncate">{extra.nombre}</span>
                       </div>
-                      <span className="text-sm text-[#666]">
-                        +${extra.precioAdicional.toLocaleString('es-AR')}
-                      </span>
+                      {extra.precioAdicional > 0 ? (
+                        <span className="text-[13px] text-[#6b6258] font-mono tabular-nums shrink-0 ml-3">
+                          +${extra.precioAdicional.toLocaleString('es-AR')}
+                        </span>
+                      ) : (
+                        <span className="text-[13px] text-[#6b6258] shrink-0 ml-3" style={{ fontStyle: 'italic' }}>
+                          Sin costo
+                        </span>
+                      )}
                     </label>
                   </li>
                 )
               })}
             </ul>
-          </>
+          </div>
         )}
 
-        {/* Quantity */}
-        <div className="px-4 py-5 flex items-center justify-between border-b border-[#e8e8e8]">
-          <p className="font-bold text-sm">Cantidad</p>
-          <div className="flex items-center gap-0">
+        {/* ── Cantidad ───────────────────────────────────────────── */}
+        <div className="px-6 py-6 flex items-center justify-between border-b border-[#e8e1d4]">
+          <p className="text-[10px] font-medium text-[#6b6258] uppercase" style={{ letterSpacing: '0.2em' }}>
+            Cantidad
+          </p>
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setCantidad(q => Math.max(1, q - 1))}
-              className="w-10 h-10 bg-[#f0f0f0] text-[#1a1a1a] font-bold text-lg flex items-center justify-center rounded-none"
+              disabled={cantidad <= 1}
+              aria-label="Restar"
+              className="w-9 h-9 border border-[#1a1a1a] bg-white text-[#1a1a1a] font-mono text-lg leading-none flex items-center justify-center rounded-none disabled:opacity-30 disabled:cursor-not-allowed"
             >
               −
             </button>
-            <span className="w-12 text-center font-bold text-base tabular-nums">
+            <span className="min-w-9 text-center font-mono tabular-nums text-[18px] font-medium">
               {cantidad}
             </span>
             <button
               onClick={() => setCantidad(q => maxCantidad != null ? Math.min(q + 1, maxCantidad) : q + 1)}
               disabled={maxCantidad != null && cantidad >= maxCantidad}
-              className="w-10 h-10 bg-[#f0f0f0] text-[#1a1a1a] font-bold text-lg flex items-center justify-center rounded-none disabled:opacity-30"
+              aria-label="Sumar"
+              className="w-9 h-9 border border-[#1a1a1a] bg-white text-[#1a1a1a] font-mono text-lg leading-none flex items-center justify-center rounded-none disabled:opacity-30 disabled:cursor-not-allowed"
             >
               +
             </button>
           </div>
         </div>
+
       </div>
 
-      {/* ── Agregar bar ────────────────────────────────────────── */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-20 text-white"
-        style={{ backgroundColor: canAdd ? '#2d5a27' : '#999' }}
-      >
-        <button
-          onClick={handleAgregar}
-          disabled={!canAdd}
-          className="w-full flex items-center justify-between px-4 py-4 disabled:cursor-not-allowed"
-        >
-          <span className="font-bold text-sm">
+      {/* ── CTA Agregar al carrito (fixed) ─────────────────────── */}
+      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#e8e1d4] px-5 py-3 flex items-center justify-between gap-4">
+        {canAdd ? (
+          <div className="flex flex-col leading-none">
+            <span className="text-[10px] font-medium text-[#6b6258] uppercase mb-1" style={{ letterSpacing: '0.2em' }}>
+              Total
+            </span>
+            <span className="font-mono tabular-nums font-bold text-[17px] text-[#1a1a1a]">
+              ${totalItem.toLocaleString('es-AR')}
+            </span>
+          </div>
+        ) : (
+          <span className="text-[13px] text-[#6b6258]" style={{ fontStyle: 'italic' }}>
             {!isOpen
               ? 'Local cerrado'
               : tieneVariantes && varianteActiva && !isVarianteAvailable(varianteActiva)
                 ? 'Agotado'
                 : tieneVariantes && !varianteActiva
                   ? 'Seleccioná una variante'
-                  : 'Agregar al pedido'}
+                  : 'No disponible'}
           </span>
-          {canAdd && (
-            <span className="font-bold">${totalItem.toLocaleString('es-AR')}</span>
-          )}
+        )}
+        <button
+          onClick={handleAgregar}
+          disabled={!canAdd}
+          className="px-6 py-3 text-[12px] font-medium uppercase rounded-none text-[#faf8f4] bg-[#73223a] hover:bg-[#651d33] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+          style={{ letterSpacing: '0.15em' }}
+        >
+          Agregar al carrito
         </button>
-      </div>
+      </footer>
     </div>
   )
 }

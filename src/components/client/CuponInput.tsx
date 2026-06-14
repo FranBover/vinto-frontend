@@ -83,19 +83,25 @@ export default function CuponInput({ slug, subtotal, onCuponAplicado }: Props) {
 
   return (
     <div className="space-y-2">
-      <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest">Cupón de descuento</p>
-
       {cupon ? (
-        <div className="flex items-center justify-between border border-[#2d5a27] px-3 py-3 bg-[#f0f7ef]">
-          <span className="text-sm text-[#2d5a27] font-bold">
-            ✓ {cupon.codigo}: -${cupon.montoDescuento.toLocaleString('es-AR')}
+        <div
+          className="flex items-center justify-between px-3 py-2.5"
+          style={{ backgroundColor: '#f4ede0', border: '1px solid #1a1a1a' }}
+        >
+          <span className="flex items-center gap-2 text-sm min-w-0">
+            <span className="font-mono font-medium text-[#1a1a1a] truncate">{cupon.codigo}</span>
+            <span className="text-[#6b6258] shrink-0">·</span>
+            <span className="font-mono shrink-0" style={{ color: '#2d5a27' }}>
+              −${cupon.montoDescuento.toLocaleString('es-AR')}
+            </span>
           </span>
           <button
             type="button"
             onClick={handleQuitar}
-            className="text-xs text-[#aaa] hover:text-[#1a1a1a] ml-3 shrink-0"
+            aria-label="Quitar cupón"
+            className="w-6 h-6 shrink-0 ml-3 border border-[#1a1a1a] flex items-center justify-center text-lg leading-none text-[#1a1a1a] hover:bg-[#1a1a1a] hover:text-[#faf8f4] transition-colors"
           >
-            Quitar
+            ×
           </button>
         </div>
       ) : (
@@ -109,22 +115,24 @@ export default function CuponInput({ slug, subtotal, onCuponAplicado }: Props) {
               setRemovedMsg(null)
             }}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleAplicar() } }}
-            placeholder="CÓDIGO"
-            className="flex-1 border border-[#d0d0d0] px-3 py-3 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white uppercase tracking-wider transition-colors"
+            placeholder="Ingresá el código"
+            className={`flex-1 border px-3 py-2.5 text-sm rounded-none outline-none bg-white text-[#1a1a1a] placeholder:text-[#6b6258] transition-shadow focus:ring-2 focus:ring-[#73223a] focus:ring-offset-0 ${
+              error ? 'border-[#a92020]' : 'border-[#1a1a1a]'
+            }`}
           />
           <button
             type="button"
             onClick={() => void handleAplicar()}
             disabled={loading || !codigo.trim()}
-            className="px-4 py-3 bg-[#1a1a1a] text-white text-sm font-bold rounded-none disabled:opacity-40 shrink-0"
+            className="px-4 py-2.5 bg-[#1a1a1a] text-[#faf8f4] text-[11px] font-medium uppercase tracking-[0.18em] rounded-none disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
           >
             {loading ? '…' : 'Aplicar'}
           </button>
         </div>
       )}
 
-      {error && <p className="text-xs text-[#ef4444]">{error}</p>}
-      {removedMsg && !cupon && <p className="text-xs text-[#f59e0b]">{removedMsg}</p>}
+      {error && <p className="text-xs mt-1" style={{ color: '#a92020' }}>{error}</p>}
+      {removedMsg && !cupon && <p className="text-xs mt-1" style={{ color: '#a16207' }}>{removedMsg}</p>}
     </div>
   )
 }
