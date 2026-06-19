@@ -2,32 +2,42 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-function esToolkitCompatShim(): Plugin {
-  const MARKER = '\0es-toolkit-shim:'
+// es-toolkit only ships a CommonJS wrapper for the `es-toolkit/compat/<fn>`
+// subpaths (its `exports` map has no `import` condition for them). Under the
+// Vite 8 / rolldown production build that CJS interop breaks for some
+// functions (e.g. `get`, used by recharts) and throws "t is not a function"
+// at runtime. We redirect every `es-toolkit/compat/<fn>` import to the ESM
+// barrel (`dist/compat/index.mjs`) and re-export the named function as the
+// default, so consumers using either `import fn from` or `import { fn } from`
+// resolve to clean ESM. This is general across all compat functions.
+function esToolkitCompatEsmShim(): Plugin {
+  const PREFIX = '\0es-toolkit-compat:'
   return {
-    name: 'es-toolkit-compat-shim',
-    resolveId(id: string) {
+    name: 'es-toolkit-compat-esm-shim',
+    enforce: 'pre',
+    resolveId(id) {
       const m = id.match(/^es-toolkit\/compat\/(\w+)$/)
-      if (m) return MARKER + m[1]
+      if (m) return PREFIX + m[1]
     },
-    load(id: string) {
-      if (!id.startsWith(MARKER)) return null
-      const fn = id.slice(MARKER.length)
-      return `import { ${fn} as _fn } from 'es-toolkit/compat'; export default _fn`
+    load(id) {
+      if (!id.startsWith(PREFIX)) return null
+      const fn = id.slice(PREFIX.length)
+      return [
+        `import { ${fn} } from 'es-toolkit/compat'`,
+        `export default ${fn}`,
+        `export { ${fn} }`,
+      ].join('\n')
     },
   }
 }
 
 export default defineConfig({
   plugins: [
-    esToolkitCompatShim(),
+    esToolkitCompatEsmShim(),
     react(),
     tailwindcss(),
   ],
   optimizeDeps: {
     include: ['recharts'],
-    rolldownOptions: {
-      plugins: [esToolkitCompatShim()],
-    },
   },
 })
