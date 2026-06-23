@@ -1,5 +1,9 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { WHATSAPP_URL, DEMO_URL } from '../../config'
+import { WHATSAPP_URL, DEMO_URL, BASE_URL } from '../../config'
+import { getMenu } from '../../api/publicApi'
+import type { Producto } from '../../types'
+import { Reveal } from '../../hooks/useReveal'
 
 const SERIF = "'Fraunces', Georgia, serif"
 
@@ -23,7 +27,31 @@ const STEPS: { num: string; titulo: string; desc: string }[] = [
 
 const MOCK_CATEGORIAS = ['Hamburguesas', 'Bebidas', 'Pizzas']
 
+// Antepone BASE_URL a las URLs relativas de imagen
+const resolveImagen = (url: string) => (url.startsWith('http') ? url : `${BASE_URL}${url}`)
+
 export default function LandingPage() {
+  const [productosDemo, setProductosDemo] = useState<Producto[] | null>(null)
+
+  useEffect(() => {
+    let activo = true
+    getMenu(DEMO_URL.replace(/^\//, ''))
+      .then(menu => {
+        if (!activo) return
+        const todos = menu.categorias.flatMap(c => c.productos)
+        // Priorizar los que tienen foto, después el resto, y tomar los primeros 3
+        const conFoto = todos.filter(p => p.imagenUrl)
+        const sinFoto = todos.filter(p => !p.imagenUrl)
+        setProductosDemo([...conFoto, ...sinFoto].slice(0, 3))
+      })
+      .catch(() => {
+        // La API está en tier gratis y puede tardar/fallar: dejamos el fallback gris
+      })
+    return () => {
+      activo = false
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-[#faf8f4] text-[#1a1a1a]">
 
@@ -64,7 +92,7 @@ export default function LandingPage() {
                 href={WHATSAPP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block bg-[#73223a] hover:bg-[#651d33] text-[#faf8f4] px-7 py-3.5 text-[11px] font-medium uppercase tracking-[0.18em] rounded-none transition-colors"
+                className="inline-block bg-[#73223a] hover:bg-[#651d33] text-[#faf8f4] px-7 py-3.5 text-[11px] font-medium uppercase tracking-[0.18em] rounded-none transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
               >
                 Quiero mi tienda
               </a>
@@ -80,7 +108,7 @@ export default function LandingPage() {
           {/* Derecha — mockup del MenuPage */}
           <div className="w-full md:w-2/5 flex justify-center">
             <div
-              className="w-full bg-[#ede5d3] p-5 rounded-3xl"
+              className="w-full bg-[#ede5d3] p-5 rounded-3xl vinto-float"
               style={{ maxWidth: '320px', aspectRatio: '4 / 5' }}
             >
               <div className="h-full flex flex-col">
@@ -95,14 +123,37 @@ export default function LandingPage() {
                 </h2>
                 <div className="mx-auto mt-3 mb-5" style={{ width: '24px', height: '1.5px', backgroundColor: '#73223a' }} />
                 <div className="flex flex-col gap-2">
-                  {MOCK_CATEGORIAS.map(nombre => (
-                    <div key={nombre} className="bg-white p-3" style={{ border: '0.5px solid #e8e1d4' }}>
-                      <div className="w-full" style={{ height: '54px', backgroundColor: '#d9cdb3' }} />
-                      <p className="mt-2 text-[#1a1a1a]" style={{ fontFamily: SERIF, fontSize: '14px', fontWeight: 400 }}>
-                        {nombre}
-                      </p>
-                    </div>
-                  ))}
+                  {productosDemo
+                    ? productosDemo.map(p => (
+                        <div key={p.id} className="bg-white p-3" style={{ border: '0.5px solid #e8e1d4' }}>
+                          {p.imagenUrl ? (
+                            <div
+                              className="w-full bg-cover bg-center"
+                              style={{ height: '54px', backgroundImage: `url(${resolveImagen(p.imagenUrl)})` }}
+                            />
+                          ) : (
+                            <div className="w-full" style={{ height: '54px', backgroundColor: '#d9cdb3' }} />
+                          )}
+                          <div className="mt-2 flex items-baseline justify-between gap-2">
+                            <p className="text-[#1a1a1a]" style={{ fontFamily: SERIF, fontSize: '14px', fontWeight: 400 }}>
+                              {p.nombre}
+                            </p>
+                            {p.precio != null && (
+                              <p className="text-[#73223a] shrink-0" style={{ fontFamily: SERIF, fontSize: '13px', fontWeight: 400 }}>
+                                ${p.precio.toLocaleString('es-AR')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    : MOCK_CATEGORIAS.map(nombre => (
+                        <div key={nombre} className="bg-white p-3" style={{ border: '0.5px solid #e8e1d4' }}>
+                          <div className="w-full" style={{ height: '54px', backgroundColor: '#d9cdb3' }} />
+                          <p className="mt-2 text-[#1a1a1a]" style={{ fontFamily: SERIF, fontSize: '14px', fontWeight: 400 }}>
+                            {nombre}
+                          </p>
+                        </div>
+                      ))}
                 </div>
               </div>
             </div>
@@ -126,8 +177,8 @@ export default function LandingPage() {
           </h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-10">
-          {FEATURES.map(f => (
-            <div key={f.titulo}>
+          {FEATURES.map((f, i) => (
+            <Reveal key={f.titulo} delay={i * 60}>
               <h3
                 className="text-[#1a1a1a] mb-2 leading-tight"
                 style={{ fontFamily: SERIF, fontSize: '19px', fontWeight: 400 }}
@@ -137,7 +188,7 @@ export default function LandingPage() {
               <p className="text-[#6b6258]" style={{ fontSize: '14.5px', lineHeight: 1.6 }}>
                 {f.desc}
               </p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -157,8 +208,8 @@ export default function LandingPage() {
           </h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-          {STEPS.map(s => (
-            <div key={s.num}>
+          {STEPS.map((s, i) => (
+            <Reveal key={s.num} delay={i * 60}>
               <p
                 className="mb-4"
                 style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 300, color: '#73223a', lineHeight: 1, fontSize: 'clamp(56px, 6vw, 80px)' }}
@@ -171,7 +222,7 @@ export default function LandingPage() {
               <p className="text-[#6b6258]" style={{ fontSize: '14.5px', lineHeight: 1.6 }}>
                 {s.desc}
               </p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -179,20 +230,22 @@ export default function LandingPage() {
       {/* ── CTA FINAL ────────────────────────────────────────── */}
       <section className="py-20 md:py-32" style={{ backgroundColor: '#ede5d3' }}>
         <div className="max-w-[700px] mx-auto px-5 text-center">
-          <h2
-            className="text-[#1a1a1a] mb-4"
-            style={{ fontFamily: SERIF, fontWeight: 400, lineHeight: 1.1, fontSize: 'clamp(40px, 5vw, 56px)' }}
-          >
-            ¿Empezamos?
-          </h2>
-          <p className="text-[#6b6258] mb-10" style={{ fontSize: '17px', lineHeight: 1.6 }}>
-            Conversemos por WhatsApp y te muestro cómo funciona.
-          </p>
+          <Reveal>
+            <h2
+              className="text-[#1a1a1a] mb-4"
+              style={{ fontFamily: SERIF, fontWeight: 400, lineHeight: 1.1, fontSize: 'clamp(40px, 5vw, 56px)' }}
+            >
+              ¿Empezamos?
+            </h2>
+            <p className="text-[#6b6258] mb-10" style={{ fontSize: '17px', lineHeight: 1.6 }}>
+              Conversemos por WhatsApp y te muestro cómo funciona.
+            </p>
+          </Reveal>
           <a
             href={WHATSAPP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-block bg-[#73223a] hover:bg-[#651d33] text-[#faf8f4] px-10 py-4 text-xs font-medium uppercase tracking-[0.18em] rounded-none transition-colors"
+            className="inline-block bg-[#73223a] hover:bg-[#651d33] text-[#faf8f4] px-10 py-4 text-xs font-medium uppercase tracking-[0.18em] rounded-none transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
           >
             Escribime por WhatsApp
           </a>
