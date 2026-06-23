@@ -91,7 +91,7 @@ export default function LandingPage() {
                   className="text-center mt-3 text-[#1a1a1a]"
                   style={{ fontFamily: SERIF, fontSize: '26px', fontWeight: 400 }}
                 >
-                  Carripollo
+                  Ejemplo
                 </h2>
                 <div className="mx-auto mt-3 mb-5" style={{ width: '24px', height: '1.5px', backgroundColor: '#73223a' }} />
                 <div className="flex flex-col gap-2">
