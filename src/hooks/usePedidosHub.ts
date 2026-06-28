@@ -24,6 +24,7 @@ export function usePedidosHub({ adminId, onNuevoPedido, onPagoConfirmado }: UseP
     const connection: HubConnection = new HubConnectionBuilder()
       .withUrl(`${BASE_URL}/hubs/pedidos`, {
         withCredentials: true,
+        accessTokenFactory: () => localStorage.getItem('vinto_admin_token') ?? '',
       })
       .withAutomaticReconnect()
       .build()
@@ -44,19 +45,13 @@ export function usePedidosHub({ adminId, onNuevoPedido, onPagoConfirmado }: UseP
       .start()
       .then(() => {
         setConnectionState(HubConnectionState.Connected)
-        return connection.invoke('JoinAdminGroup', adminId.toString())
       })
       .catch(() => {
         setConnectionState(HubConnectionState.Disconnected)
       })
 
     return () => {
-      connection
-        .invoke('LeaveAdminGroup', adminId.toString())
-        .catch(() => undefined)
-        .finally(() => {
-          connection.stop()
-        })
+      connection.stop()
     }
     // Callbacks excluidos del dependency array — caller debe memoizarlos
     // eslint-disable-next-line react-hooks/exhaustive-deps
