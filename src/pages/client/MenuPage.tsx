@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
 import { useCartStore } from '../../store/cartStore'
-import { BASE_URL, WHATSAPP_URL } from '../../config'
+import { resolveImageUrl, WHATSAPP_URL } from '../../config'
 import CartBar from '../../components/client/CartBar'
 import BannerDescuentos from '../../components/client/BannerDescuentos'
 
@@ -225,7 +225,7 @@ export default function MenuPage() {
           {categorias.map((cat) => {
             const count = cat.productos.length
             const disabled = !isOpen
-            const imgSrc = cat.imagenUrl ? BASE_URL + cat.imagenUrl : null
+            const imgSrc = cat.imagenUrl ? resolveImageUrl(cat.imagenUrl) : null
 
             return (
               <button

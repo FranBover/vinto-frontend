@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { BASE_URL } from '../../config'
+import { resolveImageUrl } from '../../config'
 import { uploadImagen, deleteImagen } from '../../api/adminApi'
 import type { ImagenResponse } from '../../api/adminApi'
 
@@ -85,7 +85,7 @@ export default function ImageUploader({
       {imagenes.map(img => (
         <div key={img.id} className="relative flex-shrink-0" style={{ width: 80, height: 80 }}>
           <img
-            src={BASE_URL + img.url}
+            src={resolveImageUrl(img.url)}
             alt={img.nombreOriginal}
             className="w-full h-full object-cover border border-[#e8e8e8]"
           />

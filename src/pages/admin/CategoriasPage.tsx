@@ -30,7 +30,7 @@ import {
 import type { ImagenResponse } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
 import type { Categoria } from '../../types'
-import { BASE_URL } from '../../config'
+import { resolveImageUrl } from '../../config'
 import ImageUploader from '../../components/admin/ImageUploader'
 
 // ── Sortable row ────────────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ function SortableRow({
       <div className="w-12 h-12 flex-shrink-0 bg-[#f5f5f5] border border-[#e8e8e8] flex items-center justify-center overflow-hidden">
         {categoria.imagenUrl ? (
           <img
-            src={BASE_URL + categoria.imagenUrl}
+            src={resolveImageUrl(categoria.imagenUrl)}
             alt={categoria.nombre}
             className="w-full h-full object-cover"
           />

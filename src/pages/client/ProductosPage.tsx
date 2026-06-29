@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
 import CartBar from '../../components/client/CartBar'
-import { BASE_URL } from '../../config'
+import { resolveImageUrl as resolveImageSrc } from '../../config'
 import type { Producto } from '../../types'
 
 const SERIF = "'Fraunces', Georgia, serif"
@@ -35,7 +35,7 @@ function getPrecioInfo(producto: Producto): PrecioInfo {
 
 function resolveImageUrl(producto: Producto): string | null {
   if (producto.imagenes && producto.imagenes.length > 0) {
-    return BASE_URL + producto.imagenes[0].url
+    return resolveImageSrc(producto.imagenes[0].url)
   }
   if (producto.imagenUrl) return producto.imagenUrl
   return null

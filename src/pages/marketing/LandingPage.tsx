@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { WHATSAPP_URL, DEMO_URL, BASE_URL } from '../../config'
+import { WHATSAPP_URL, DEMO_URL, resolveImageUrl } from '../../config'
 import { getMenu } from '../../api/publicApi'
 import type { Producto } from '../../types'
 import { Reveal } from '../../hooks/useReveal'
@@ -26,9 +26,6 @@ const STEPS: { num: string; titulo: string; desc: string }[] = [
 ]
 
 const MOCK_CATEGORIAS = ['Hamburguesas', 'Bebidas', 'Pizzas']
-
-// Antepone BASE_URL a las URLs relativas de imagen
-const resolveImagen = (url: string) => (url.startsWith('http') ? url : `${BASE_URL}${url}`)
 
 export default function LandingPage() {
   const [productosDemo, setProductosDemo] = useState<Producto[] | null>(null)
@@ -129,7 +126,7 @@ export default function LandingPage() {
                           {p.imagenUrl ? (
                             <div
                               className="w-full bg-cover bg-center"
-                              style={{ height: '54px', backgroundImage: `url(${resolveImagen(p.imagenUrl)})` }}
+                              style={{ height: '54px', backgroundImage: `url(${resolveImageUrl(p.imagenUrl)})` }}
                             />
                           ) : (
                             <div className="w-full" style={{ height: '54px', backgroundColor: '#d9cdb3' }} />

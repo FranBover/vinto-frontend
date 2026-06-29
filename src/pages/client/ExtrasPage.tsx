@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
 import { useCartStore } from '../../store/cartStore'
 import type { Producto, ProductoExtra, TipoVarianteMenu, VarianteMenu } from '../../types'
-import { BASE_URL } from '../../config'
+import { resolveImageUrl } from '../../config'
 
 const SERIF = "'Fraunces', Georgia, serif"
 
@@ -12,7 +12,7 @@ function resolveImages(producto: Producto): string[] {
     return producto.imagenes
       .slice()
       .sort((a, b) => a.orden - b.orden)
-      .map(i => BASE_URL + i.url)
+      .map(i => resolveImageUrl(i.url))
   }
   if (producto.imagenUrl) return [producto.imagenUrl]
   return []
