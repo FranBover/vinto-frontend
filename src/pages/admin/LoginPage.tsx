@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore'
 export default function LoginPage() {
   const navigate = useNavigate()
   const guardarToken = useAuthStore(s => s.guardarToken)
+  const sesionExpirada = useAuthStore(s => s.sesionExpirada)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -77,6 +78,19 @@ export default function LoginPage() {
               className={inputCls}
             />
           </div>
+
+          {sesionExpirada && !error && (
+            <div
+              role="alert"
+              className="border-l-4 px-4 py-3"
+              style={{ backgroundColor: '#fdecec', color: '#a92020', borderLeftColor: '#a92020' }}
+            >
+              <p className="font-bold text-sm">Tu sesión expiró</p>
+              <p className="text-xs mt-0.5 leading-relaxed">
+                Por seguridad, volvé a iniciar sesión para seguir.
+              </p>
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-red-600">{error}</p>

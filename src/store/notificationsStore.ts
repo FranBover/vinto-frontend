@@ -41,9 +41,16 @@ interface NotificationsState {
   ultimoNuevoPedido: NuevoPedidoPayload | null
   ultimoPagoConfirmado: PagoConfirmadoPayload | null
 
+  // Se incrementa tras una reconexión real del hub (no en la conexión inicial)
+  reconexiones: number
+
   // Acciones para emitir eventos (las llama el hook desde AdminLayout)
   emitirNuevoPedido: (payload: NuevoPedidoPayload) => void
   emitirPagoConfirmado: (payload: PagoConfirmadoPayload) => void
+  emitirReconexion: () => void
+  // Toasts de pedidos perdidos durante una caída. No toca ultimoNuevoPedido
+  // para no disparar un refetch más.
+  avisarPedidosPerdidos: (payloads: NuevoPedidoPayload[]) => void
 
   // Acción para cerrar un toast
   cerrarToast: (id: string) => void
@@ -57,6 +64,18 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
   toasts: [],
   ultimoNuevoPedido: null,
   ultimoPagoConfirmado: null,
+  reconexiones: 0,
+
+  emitirReconexion: () => set((state) => ({ reconexiones: state.reconexiones + 1 })),
+
+  avisarPedidosPerdidos: (payloads) => {
+    const nuevos: ToastItem[] = payloads.map((p) => ({
+      id: generarId(),
+      tipo: 'nuevoPedido',
+      nuevoPedido: p,
+    }))
+    set((state) => ({ toasts: [...state.toasts, ...nuevos] }))
+  },
 
   emitirNuevoPedido: (payload) => {
     const toast: ToastItem = {

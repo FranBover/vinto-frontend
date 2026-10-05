@@ -3,6 +3,7 @@ import Sidebar from './Sidebar'
 import NuevoPedidoToast from '../NuevoPedidoToast'
 import PagoConfirmadoToast from './PagoConfirmadoToast'
 import MercadoPagoStatusBanner from './MercadoPagoStatusBanner'
+import { ConexionBanner, ConexionChip } from './ConexionIndicador'
 import { usePedidosHub } from '../../hooks/usePedidosHub'
 import { useAuthStore } from '../../store/authStore'
 import {
@@ -22,7 +23,8 @@ export default function AdminLayout({ title, subtitle, actions, children }: Prop
   const adminId = useAuthStore(s => s.adminId)
   const emitirNuevoPedido = useNotificationsStore(s => s.emitirNuevoPedido)
   const emitirPagoConfirmado = useNotificationsStore(s => s.emitirPagoConfirmado)
-  const toasts = useNotificationsStore(s => s.toasts)
+  const emitirReconexion = useNotificationsStore(s => s.emitirReconexion)
+  const toasts =useNotificationsStore(s => s.toasts)
   const cerrarToast = useNotificationsStore(s => s.cerrarToast)
 
   const handleNuevoPedido = useCallback(
@@ -34,10 +36,11 @@ export default function AdminLayout({ title, subtitle, actions, children }: Prop
     [emitirPagoConfirmado]
   )
 
-  usePedidosHub({
+  const { connectionState } = usePedidosHub({
     adminId,
     onNuevoPedido: handleNuevoPedido,
     onPagoConfirmado: handlePagoConfirmado,
+    onReconectado: emitirReconexion,
   })
 
   return (
@@ -57,9 +60,13 @@ export default function AdminLayout({ title, subtitle, actions, children }: Prop
               <p className="text-xs text-[#aaa] mt-0.5">{subtitle}</p>
             )}
           </div>
-          {actions && <div className="flex items-center gap-3">{actions}</div>}
+          <div className="flex items-center gap-5">
+            <ConexionChip state={connectionState} />
+            {actions && <div className="flex items-center gap-3">{actions}</div>}
+          </div>
         </header>
 
+        <ConexionBanner state={connectionState} />
         <MercadoPagoStatusBanner />
 
         {/* Page content */}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminLayout from '../../components/admin/AdminLayout'
 import { getPedidos } from '../../api/adminApi'
@@ -22,6 +22,9 @@ const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }
   Confirmado:    { label: 'Confirmado',     bg: '#dbeafe', color: '#1e40af' },
   'En camino':   { label: 'En camino',      bg: '#ede9fe', color: '#5b21b6' },
 }
+
+// Tope de toasts por reconexión; la lista igual muestra todos.
+const MAX_AVISOS_RECONEXION = 5
 
 const FALLBACK_ESTADO = { label: 'Desconocido', bg: '#f3f4f6', color: '#6b7280' }
 
@@ -58,19 +61,51 @@ export default function PedidosPage() {
   const ultimoNuevoPedido = useNotificationsStore(s => s.ultimoNuevoPedido)
   const ultimoPagoConfirmado = useNotificationsStore(s => s.ultimoPagoConfirmado)
 
-  const fetchPedidos = useCallback(() => {
+  const reconexiones = useNotificationsStore(s => s.reconexiones)
+  const avisarPedidosPerdidos = useNotificationsStore(s => s.avisarPedidosPerdidos)
+  // Arranca en el valor actual: una reconexión anterior a este montaje no cuenta.
+  const reconexionesVistas = useRef(reconexiones)
+  // Ids de la última lista cargada con éxito; null = todavía no hay base de comparación.
+  const idsPrevios = useRef<Set<number> | null>(null)
+
+  const fetchPedidos = useCallback((avisarNuevos = false) => {
     if (!adminId) return
     getPedidos(adminId, activeFiltros)
       .then(data => {
+        if (avisarNuevos && idsPrevios.current) {
+          const previos = idsPrevios.current
+          const perdidos = data
+            .filter(p => !previos.has(p.id))
+            .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+            .slice(0, MAX_AVISOS_RECONEXION)
+          if (perdidos.length > 0) {
+            avisarPedidosPerdidos(perdidos.map(p => ({
+              pedidoId: p.id,
+              codigoSeguimiento: '',
+              nombreCliente: p.nombreCliente,
+              total: p.total,
+              fechaCreacion: p.fecha,
+            })))
+          }
+        }
+        idsPrevios.current = new Set(data.map(p => p.id))
         setPedidos([...data].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()))
       })
       .catch(() => setError('No se pudieron cargar los pedidos.'))
       .finally(() => setLoading(false))
-  }, [adminId, activeFiltros])
+  }, [adminId, activeFiltros, avisarPedidosPerdidos])
 
   useEffect(() => {
     fetchPedidos()
   }, [fetchPedidos])
+
+  // Reconexión real del hub: SignalR no reenvía lo perdido, hay que volver a pedir la lista.
+  useEffect(() => {
+    if (reconexiones === reconexionesVistas.current) return
+    reconexionesVistas.current = reconexiones
+    fetchPedidos(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reconexiones])
 
   useEffect(() => {
     if (ultimoNuevoPedido) fetchPedidos()

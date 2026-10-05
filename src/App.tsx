@@ -1,5 +1,6 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
-import { useAuthStore } from './store/authStore'
+import { getTokenExpMs, useAuthStore } from './store/authStore'
 
 import LandingPage from './pages/marketing/LandingPage'
 import MenuPage from './pages/client/MenuPage'
@@ -24,8 +25,29 @@ import DescuentosPage from './pages/admin/DescuentosPage'
 import CuponesPage from './pages/admin/CuponesPage'
 
 function ProtectedRoute() {
-  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
-  return isAuthenticated() ? <Outlet /> : <Navigate to="/admin/login" replace />
+  // Suscribirse al token (no a la función isAuthenticated) para re-renderizar al limpiarlo.
+  const token = useAuthStore(s => s.token)
+  const expirarSesion = useAuthStore(s => s.expirarSesion)
+
+  useEffect(() => {
+    if (!token) return
+    const expMs = getTokenExpMs(token)
+    if (expMs === null) return
+
+    const chequear = () => {
+      if (expMs <= Date.now()) expirarSesion()
+    }
+    // Los timers se atrasan con la pestaña en segundo plano o la PC suspendida:
+    // se re-chequea al volver a la pestaña.
+    const timer = window.setTimeout(chequear, Math.min(Math.max(expMs - Date.now(), 0), 2 ** 31 - 1))
+    document.addEventListener('visibilitychange', chequear)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', chequear)
+    }
+  }, [token, expirarSesion])
+
+  return token ? <Outlet /> : <Navigate to="/admin/login" replace />
 }
 
 export default function App() {

@@ -20,8 +20,9 @@ apiClient.interceptors.request.use(config => {
 apiClient.interceptors.response.use(
   res => res,
   error => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout()
+    // Un 401 del login son credenciales incorrectas, no una sesión vencida.
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
+      useAuthStore.getState().expirarSesion()
     }
     return Promise.reject(error)
   }
