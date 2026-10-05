@@ -144,7 +144,7 @@ export interface Variante {
 
 export type EstadoPedido = 'Pendiente' | 'Confirmado' | 'EnPreparacion' | 'Listo' | 'Entregado' | 'Cancelado'
 export type FormaPago = 'Efectivo' | 'Transferencia' | 'Tarjeta'
-export type FormaEntrega = 'Local' | 'Delivery'
+export type FormaEntrega = 'Retira' | 'Delivery'
 
 export interface DetallePedidoExtra {
   nombre: string

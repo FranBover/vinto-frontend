@@ -30,7 +30,7 @@ function ComandaContent({ d }: { d: ComandaResponseDTO }) {
         COMANDA #{d.codigoSeguimiento}
       </p>
       <p>{fmt(d.fecha)}</p>
-      <p>{d.formaEntrega === 'Local' ? 'Retiro en local' : 'Delivery'}</p>
+      <p>{d.formaEntrega === 'Delivery' ? 'Delivery' : 'Retiro en local'}</p>
       <p style={{ marginTop: 4 }}><strong>{d.nombreCliente}</strong></p>
       {d.direccionCliente && <p>{d.direccionCliente}</p>}
       {d.referenciaDireccion && <p style={{ fontSize: 12, color: '#555' }}>Ref: {d.referenciaDireccion}</p>}
@@ -61,7 +61,7 @@ function TicketContent({ d }: { d: TicketResponseDTO }) {
       <p style={{ marginTop: 4 }}>{fmt(d.fecha)}</p>
       <p style={{ margin: '10px 0', letterSpacing: 1 }}>{SEP}</p>
       <p><strong>{d.nombreCliente}</strong> — {d.telefonoCliente}</p>
-      <p>{d.formaEntrega === 'Local' ? 'Retiro en local' : 'Delivery'}</p>
+      <p>{d.formaEntrega === 'Delivery' ? 'Delivery' : 'Retiro en local'}</p>
       {d.direccionCliente && <p>{d.direccionCliente}</p>}
       {d.referenciaDireccion && <p style={{ fontSize: 12, color: '#555' }}>Ref: {d.referenciaDireccion}</p>}
       <p style={{ marginTop: 4 }}>Pago: {d.formaPago}</p>

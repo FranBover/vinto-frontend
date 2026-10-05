@@ -256,7 +256,7 @@ export default function PedidoDetallePage() {
           <div className="space-y-3">
             <div>
               <p className={labelCls}>Forma de entrega</p>
-              <p className="text-sm font-medium">{pedido.formaEntrega === 'Local' ? 'Retiro en local' : 'Delivery'}</p>
+              <p className="text-sm font-medium">{pedido.formaEntrega === 'Delivery' ? 'Delivery' : 'Retiro en local'}</p>
             </div>
             {pedido.formaEntrega === 'Delivery' && (
               <>

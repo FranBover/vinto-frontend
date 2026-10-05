@@ -31,7 +31,7 @@ export default function CheckoutPage() {
 
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
-  const [formaEntrega, setFormaEntrega] = useState<FormaEntrega>('Local')
+  const [formaEntrega, setFormaEntrega] = useState<FormaEntrega>('Retira')
   const [formaPago, setFormaPago] = useState<FormaPago>('Efectivo')
   const [direccion, setDireccion] = useState('')
   const [lat, setLat] = useState(0)
@@ -257,7 +257,7 @@ export default function CheckoutPage() {
         {/* ── ENTREGA ────────────────────────────────────────────── */}
         <p className={`${eyebrowCls} mt-10`}>Entrega</p>
         <div className="flex flex-col gap-2">
-          {(['Local', 'Delivery'] as FormaEntrega[]).map(opt => {
+          {(['Retira', 'Delivery'] as FormaEntrega[]).map(opt => {
             const selected = formaEntrega === opt
             return (
               <button
@@ -269,10 +269,10 @@ export default function CheckoutPage() {
                 }`}
               >
                 <p className="text-sm font-medium">
-                  {opt === 'Local' ? 'Retiro en local' : 'Delivery'}
+                  {opt === 'Retira' ? 'Retiro en local' : 'Delivery'}
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: selected ? '#d4cbb8' : '#6b6258' }}>
-                  {opt === 'Local'
+                  {opt === 'Retira'
                     ? 'Retirás en el local'
                     : menu?.local.costoEnvio != null
                       ? `Envío $${menu.local.costoEnvio.toLocaleString('es-AR')}`
@@ -476,7 +476,7 @@ export default function CheckoutPage() {
         )}
 
         {/* Retiro: local address */}
-        {formaEntrega === 'Local' && menu?.local.direccion && (
+        {formaEntrega === 'Retira' && menu?.local.direccion && (
           <div className="mt-4 px-4 py-4" style={{ backgroundColor: '#ede5d3' }}>
             <p className="text-[10px] font-medium uppercase text-[#6b6258] mb-1.5" style={{ letterSpacing: '0.2em' }}>
               Dirección del local

@@ -32,7 +32,7 @@ const FORMA_PAGO_LABEL: Record<FormaPago, string> = {
 }
 
 const FORMA_ENTREGA_LABEL: Record<FormaEntrega, string> = {
-  Local:   'Retiro',
+  Retira:  'Retiro',
   Delivery: 'Delivery',
 }
 
@@ -128,7 +128,7 @@ export default function PedidosPage() {
         >
           <option value="">Entrega: todas</option>
           <option value="Delivery">Delivery</option>
-          <option value="Local">Retira</option>
+          <option value="Retira">Retira</option>
         </select>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

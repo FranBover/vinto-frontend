@@ -25,7 +25,7 @@ const LABEL_PAGO: Record<FormaPago, string> = {
 }
 
 const LABEL_ENTREGA: Record<FormaEntrega, string> = {
-  Local: 'Retiro en local',
+  Retira: 'Retiro en local',
   Delivery: 'Delivery',
 }
 
