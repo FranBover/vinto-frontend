@@ -16,6 +16,7 @@ export interface Administrador {
   nombre: string
   email: string
   nombreLocal: string
+  slugLocal: string
   direccion: string
   telefono: string
   linkWhatsapp: string

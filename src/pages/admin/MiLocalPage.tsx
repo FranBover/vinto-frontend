@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore'
 import type { Administrador } from '../../types'
 import ImageUploader from '../../components/admin/ImageUploader'
 import SeccionMercadoPago from '../../components/admin/SeccionMercadoPago'
+import SeccionUrlPublica from '../../components/admin/SeccionUrlPublica'
 
 const inputCls =
   'w-full border border-[#d0d0d0] px-3 py-2.5 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white transition-colors'
@@ -109,7 +110,15 @@ export default function MiLocalPage() {
       {loading ? (
         <p className="text-sm text-[#aaa] py-8 text-center">Cargando…</p>
       ) : (
-        <form id="mi-local-form" onSubmit={handleSave} className="max-w-lg space-y-6">
+        <div className="max-w-lg space-y-6">
+        {admin && adminId && (
+          <SeccionUrlPublica
+            adminId={adminId}
+            admin={admin}
+            onSlugGuardado={slugLocal => setAdmin(prev => (prev ? { ...prev, slugLocal } : prev))}
+          />
+        )}
+        <form id="mi-local-form" onSubmit={handleSave} className="space-y-6">
 
           {/* Abierto/Cerrado toggle */}
           <div className="border border-[#e8e8e8] bg-white px-6 py-5 flex items-center justify-between">
@@ -291,12 +300,8 @@ export default function MiLocalPage() {
           {/* Local "completo" = tiene nombre, dirección y teléfono cargados */}
           <SeccionMercadoPago localCompleto={!!(nombreLocal.trim() && direccion.trim() && telefono.trim())} />
 
-          {admin && (
-            <div className="text-xs text-[#aaa]">
-              Slug del local: <span className="font-mono text-[#666]">{admin.nombre.toLowerCase().replace(/\s+/g, '-')}</span>
-            </div>
-          )}
         </form>
+        </div>
       )}
     </AdminLayout>
   )
