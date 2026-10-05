@@ -26,6 +26,8 @@ const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }
 // Tope de toasts por reconexión; la lista igual muestra todos.
 const MAX_AVISOS_RECONEXION = 5
 
+const PAGE_SIZE = 25
+
 const FALLBACK_ESTADO = { label: 'Desconocido', bg: '#f3f4f6', color: '#6b7280' }
 
 const FORMA_PAGO_LABEL: Record<FormaPago, string> = {
@@ -45,6 +47,18 @@ function formatFecha(iso: string) {
     ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
 
+// Números a mostrar: primera, última y ventana de ±1 alrededor de la actual; null = "…".
+function paginasVisibles(actual: number, ultima: number): (number | null)[] {
+  const nums = new Set([1, ultima, actual - 1, actual, actual + 1].filter(n => n >= 1 && n <= ultima))
+  const orden = [...nums].sort((a, b) => a - b)
+  const out: (number | null)[] = []
+  orden.forEach((n, i) => {
+    if (i > 0 && n - orden[i - 1] > 1) out.push(null)
+    out.push(n)
+  })
+  return out
+}
+
 function todayLabel() {
   return new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
@@ -57,6 +71,10 @@ export default function PedidosPage() {
   const [error, setError] = useState<string | null>(null)
   const [draftFiltros, setDraftFiltros] = useState<PedidosFiltros>(FILTROS_VACIOS)
   const [activeFiltros, setActiveFiltros] = useState<PedidosFiltros>(FILTROS_VACIOS)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const hayFiltros = Object.values(activeFiltros).some(Boolean)
 
   const ultimoNuevoPedido = useNotificationsStore(s => s.ultimoNuevoPedido)
   const ultimoPagoConfirmado = useNotificationsStore(s => s.ultimoPagoConfirmado)
@@ -68,32 +86,55 @@ export default function PedidosPage() {
   // Ids de la última lista cargada con éxito; null = todavía no hay base de comparación.
   const idsPrevios = useRef<Set<number> | null>(null)
 
+  // Descarta respuestas de pedidos viejos si el admin cambió de página/filtros mientras cargaba.
+  const requestId = useRef(0)
+
   const fetchPedidos = useCallback((avisarNuevos = false) => {
     if (!adminId) return
-    getPedidos(adminId, activeFiltros)
+    const miRequest = ++requestId.current
+    getPedidos(adminId, activeFiltros, page, PAGE_SIZE)
       .then(data => {
-        if (avisarNuevos && idsPrevios.current) {
-          const previos = idsPrevios.current
-          const perdidos = data
-            .filter(p => !previos.has(p.id))
-            .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-            .slice(0, MAX_AVISOS_RECONEXION)
-          if (perdidos.length > 0) {
-            avisarPedidosPerdidos(perdidos.map(p => ({
-              pedidoId: p.id,
-              codigoSeguimiento: '',
-              nombreCliente: p.nombreCliente,
-              total: p.total,
-              fechaCreacion: p.fecha,
-            })))
-          }
+        if (miRequest !== requestId.current) return
+        // Pasó el último (ej. se achicó la lista): volver a la última página real.
+        if (data.items.length === 0 && data.total > 0 && page > data.totalPages) {
+          setPage(data.totalPages)
+          return
         }
-        idsPrevios.current = new Set(data.map(p => p.id))
-        setPedidos([...data].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()))
+        // El diff de "perdidos" solo es válido en la página 1 sin filtros: ahí caen los nuevos.
+        const esVistaEnVivo = page === 1 && !hayFiltros
+        if (esVistaEnVivo) {
+          if (avisarNuevos && idsPrevios.current) {
+            const previos = idsPrevios.current
+            // El backend ya ordena por fecha DESC, id DESC.
+            const perdidos = data.items
+              .filter(p => !previos.has(p.id))
+              .slice(0, MAX_AVISOS_RECONEXION)
+            if (perdidos.length > 0) {
+              avisarPedidosPerdidos(perdidos.map(p => ({
+                pedidoId: p.id,
+                codigoSeguimiento: '',
+                nombreCliente: p.nombreCliente,
+                total: p.total,
+                fechaCreacion: p.fecha,
+              })))
+            }
+          }
+          idsPrevios.current = new Set(data.items.map(p => p.id))
+        } else {
+          idsPrevios.current = null
+        }
+        setPedidos(data.items)
+        setTotal(data.total)
+        setTotalPages(data.totalPages)
+        setError(null)
+        setLoading(false)
       })
-      .catch(() => setError('No se pudieron cargar los pedidos.'))
-      .finally(() => setLoading(false))
-  }, [adminId, activeFiltros, avisarPedidosPerdidos])
+      .catch(() => {
+        if (miRequest !== requestId.current) return
+        setError('No se pudieron cargar los pedidos.')
+        setLoading(false)
+      })
+  }, [adminId, activeFiltros, page, hayFiltros, avisarPedidosPerdidos])
 
   useEffect(() => {
     fetchPedidos()
@@ -116,6 +157,21 @@ export default function PedidosPage() {
     if (ultimoPagoConfirmado) fetchPedidos()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ultimoPagoConfirmado])
+
+  // Filtros nuevos = otra lista: vuelve a la página 1 y la base del diff ya no sirve.
+  const aplicarFiltros = (filtros: PedidosFiltros) => {
+    idsPrevios.current = null
+    setLoading(true)
+    setError(null)
+    setPage(1)
+    setActiveFiltros(filtros)
+  }
+
+  const irAPagina = (nueva: number) => {
+    if (nueva === page || nueva < 1 || nueva > totalPages) return
+    setLoading(true)
+    setPage(nueva)
+  }
 
   const inputStyle: React.CSSProperties = {
     border: '1px solid #d0d0d0',
@@ -187,7 +243,7 @@ export default function PedidosPage() {
         </div>
 
         <button
-          onClick={() => { setLoading(true); setError(null); setActiveFiltros({ ...draftFiltros }) }}
+          onClick={() => aplicarFiltros({ ...draftFiltros })}
           style={{
             padding: '6px 16px',
             fontSize: '13px',
@@ -203,7 +259,7 @@ export default function PedidosPage() {
         </button>
 
         <button
-          onClick={() => { setDraftFiltros(FILTROS_VACIOS); setLoading(true); setError(null); setActiveFiltros(FILTROS_VACIOS) }}
+          onClick={() => { setDraftFiltros(FILTROS_VACIOS); aplicarFiltros(FILTROS_VACIOS) }}
           style={{
             padding: '6px 16px',
             fontSize: '13px',
@@ -224,6 +280,12 @@ export default function PedidosPage() {
       )}
       {error && (
         <p className="text-sm text-red-600 py-8 text-center">{error}</p>
+      )}
+      {!loading && !error && (
+        <p className="mb-2 text-xs text-[#666]">
+          {total} {total === 1 ? 'pedido' : 'pedidos'}
+          {totalPages > 1 && ` · página ${page} de ${totalPages}`}
+        </p>
       )}
       {!loading && !error && (
         <div className="border border-[#e8e8e8] bg-white overflow-hidden">
@@ -279,6 +341,45 @@ export default function PedidosPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {!loading && !error && totalPages > 1 && (
+        <nav
+          aria-label="Paginación de pedidos"
+          className="mt-4 flex flex-wrap items-center justify-center gap-2"
+        >
+          <button
+            onClick={() => irAPagina(page - 1)}
+            disabled={page === 1}
+            className="px-4 py-1.5 text-[13px] font-semibold border border-[#1a1a1a] bg-white text-[#1a1a1a] rounded-none cursor-pointer disabled:opacity-40 disabled:cursor-default"
+          >
+            Anterior
+          </button>
+          {paginasVisibles(page, totalPages).map((n, i) =>
+            n === null ? (
+              <span key={`gap-${i}`} className="px-1 text-[13px] text-[#aaa]">…</span>
+            ) : (
+              <button
+                key={n}
+                onClick={() => irAPagina(n)}
+                aria-current={n === page ? 'page' : undefined}
+                className={`min-w-9 px-3 py-1.5 text-[13px] font-semibold border border-[#1a1a1a] rounded-none cursor-pointer ${
+                  n === page
+                    ? 'bg-[#1a1a1a] text-white'
+                    : 'bg-white text-[#1a1a1a] hover:bg-[#fafaf9]'
+                }`}
+              >
+                {n}
+              </button>
+            ),
+          )}
+          <button
+            onClick={() => irAPagina(page + 1)}
+            disabled={page === totalPages}
+            className="px-4 py-1.5 text-[13px] font-semibold border border-[#1a1a1a] bg-white text-[#1a1a1a] rounded-none cursor-pointer disabled:opacity-40 disabled:cursor-default"
+          >
+            Siguiente
+          </button>
+        </nav>
       )}
     </AdminLayout>
   )

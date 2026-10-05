@@ -192,6 +192,14 @@ export interface Pedido {
   mercadoPagoCollectionId?: string | null
 }
 
+export interface PedidosPaginados {
+  items: Pedido[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 // ── Respuesta creación de pedido ─────────────────────────────────────────────
 
 export interface PedidoCreateResponse {

@@ -1,6 +1,7 @@
 import { apiClient } from './client'
 import type {
   Pedido,
+  PedidosPaginados,
   UpdateEstadoDto,
   Producto,
   Categoria,
@@ -38,14 +39,23 @@ export interface PedidosFiltros {
   formaEntrega?: string
 }
 
-export const getPedidos = async (adminId: number, filtros?: PedidosFiltros): Promise<Pedido[]> => {
-  const params = new URLSearchParams({ adminId: adminId.toString() })
+export const getPedidos = async (
+  adminId: number,
+  filtros?: PedidosFiltros,
+  page = 1,
+  pageSize = 25,
+): Promise<PedidosPaginados> => {
+  const params = new URLSearchParams({
+    adminId: adminId.toString(),
+    page: page.toString(),
+    pageSize: pageSize.toString(),
+  })
   if (filtros?.estado)       params.set('estado',       filtros.estado)
   if (filtros?.desde)        params.set('desde',        filtros.desde)
   if (filtros?.hasta)        params.set('hasta',        filtros.hasta)
   if (filtros?.formaPago)    params.set('formaPago',    filtros.formaPago)
   if (filtros?.formaEntrega) params.set('formaEntrega', filtros.formaEntrega)
-  const { data } = await apiClient.get<Pedido[]>(`/pedidos?${params}`)
+  const { data } = await apiClient.get<PedidosPaginados>(`/pedidos?${params}`)
   return data
 }
 
