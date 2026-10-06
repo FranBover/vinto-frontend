@@ -312,8 +312,6 @@ export interface EstadoPagoPublicoResponse {
   estado?: string
   mercadoPagoStatus?: string
   total?: number
-  resumenWhatsApp?: string
-  nombreCliente?: string
   linkWhatsapp?: string
 }
 

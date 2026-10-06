@@ -6,9 +6,6 @@ import type { EstadoPagoPublicoResponse } from '../../types'
 
 const SERIF = "'Fraunces', Georgia, serif"
 
-const MENSAJE_PENDING_EXTRA =
-  '\n\n⏳ Estoy esperando la confirmación del pago por Mercado Pago. Te aviso apenas se confirme.'
-
 function getWhatsAppNumber(linkWhatsapp: string | null | undefined): string | null {
   if (!linkWhatsapp) return null
   const match = linkWhatsapp.match(/wa\.me\/(\d+)/)
@@ -27,7 +24,6 @@ export default function PagoPendingPage() {
   const [data, setData] = useState<EstadoPagoPublicoResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [showResumen, setShowResumen] = useState(false)
 
   // Vaciar carrito al cargar (igual que ConfirmacionPage)
   useEffect(() => {
@@ -96,13 +92,13 @@ export default function PagoPendingPage() {
   }
 
   const waNumber = getWhatsAppNumber(data.linkWhatsapp)
-  const textoWhatsApp = (data.resumenWhatsApp ?? '') + MENSAJE_PENDING_EXTRA
+  // El mensaje se arma acá con solo el código: el endpoint público no devuelve datos del cliente.
+  const textoWhatsApp = `Hola, mi pago del pedido #${codigo} quedó pendiente en Mercado Pago. Les aviso apenas se acredite y les paso el comprobante.`
   const waLink = waNumber
     ? `https://wa.me/${waNumber}?text=${encodeURIComponent(textoWhatsApp)}`
     : null
 
   const rows: { label: string; value: string; mono?: boolean }[] = [
-    ...(data.nombreCliente ? [{ label: 'Nombre', value: data.nombreCliente }] : []),
     ...(data.total != null ? [{ label: 'Total', value: `$${data.total.toLocaleString('es-AR')}`, mono: true }] : []),
   ]
 
@@ -139,28 +135,6 @@ export default function PagoPendingPage() {
           </div>
         )}
 
-        {data.resumenWhatsApp && (
-          <div className="mx-auto" style={{ maxWidth: '360px' }}>
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] mb-2">
-              Resumen del pedido
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowResumen(v => !v)}
-              className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] hover:text-[#73223a] underline underline-offset-4 decoration-1 decoration-[#e8e1d4] hover:decoration-[#73223a] transition-colors"
-            >
-              {showResumen ? 'Ocultar detalle' : 'Ver detalle'}
-            </button>
-            {showResumen && (
-              <pre
-                className="mt-3 text-xs whitespace-pre-wrap font-sans leading-relaxed px-4 py-4 overflow-auto text-[#1a1a1a]"
-                style={{ backgroundColor: '#ede5d3' }}
-              >
-                {data.resumenWhatsApp}
-              </pre>
-            )}
-          </div>
-        )}
       </div>
 
       <footer className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#e8e1d4]">

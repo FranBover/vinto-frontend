@@ -28,7 +28,6 @@ export default function PagoSuccessPage() {
   const codigo = searchParams.get('codigo')
   const [status, setStatus] = useState<Status>('polling')
   const [data, setData] = useState<EstadoPagoPublicoResponse | null>(null)
-  const [showResumen, setShowResumen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cartClearedRef = useRef(false)
@@ -147,7 +146,8 @@ export default function PagoSuccessPage() {
   const waNumber = getWhatsAppNumber(data?.linkWhatsapp)
   const isConfirmed = status === 'confirmed'
 
-  const textoWhatsApp = data?.resumenWhatsApp ?? ''
+  // El mensaje se arma acá con solo el código: el endpoint público no devuelve datos del cliente.
+  const textoWhatsApp = codigo ? `Hola, consulto por mi pedido #${codigo}` : ''
   const waLink = waNumber && textoWhatsApp
     ? `https://wa.me/${waNumber}?text=${encodeURIComponent(textoWhatsApp)}`
     : null
@@ -160,7 +160,6 @@ export default function PagoSuccessPage() {
     : 'Tu pago se está procesando. Enviá el comprobante por WhatsApp para confirmar tu pedido apenas se acredite.'
 
   const rows: { label: string; value: string; mono?: boolean }[] = [
-    ...(data?.nombreCliente ? [{ label: 'Nombre', value: data.nombreCliente }] : []),
     ...(data?.total != null ? [{ label: 'Total', value: `$${data.total.toLocaleString('es-AR')}`, mono: true }] : []),
   ]
 
@@ -197,28 +196,6 @@ export default function PagoSuccessPage() {
           </div>
         )}
 
-        {textoWhatsApp && (
-          <div className="mx-auto" style={{ maxWidth: '360px' }}>
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] mb-2">
-              Resumen del pedido
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowResumen(v => !v)}
-              className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] hover:text-[#73223a] underline underline-offset-4 decoration-1 decoration-[#e8e1d4] hover:decoration-[#73223a] transition-colors"
-            >
-              {showResumen ? 'Ocultar detalle' : 'Ver detalle'}
-            </button>
-            {showResumen && (
-              <pre
-                className="mt-3 text-xs whitespace-pre-wrap font-sans leading-relaxed px-4 py-4 overflow-auto text-[#1a1a1a]"
-                style={{ backgroundColor: '#ede5d3' }}
-              >
-                {textoWhatsApp}
-              </pre>
-            )}
-          </div>
-        )}
       </div>
 
       <footer className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#e8e1d4]">
