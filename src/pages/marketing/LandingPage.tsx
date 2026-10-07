@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type SyntheticEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { WHATSAPP_URL, DEMO_URL, resolveImageUrl } from '../../config'
-import { getMenu } from '../../api/publicApi'
-import type { Producto } from '../../types'
+import { WHATSAPP_URL, DEMO_URL } from '../../config'
 import { Reveal } from '../../hooks/useReveal'
 
 const SERIF = "'Fraunces', Georgia, serif"
@@ -26,30 +24,97 @@ const STEPS: { num: string; titulo: string; desc: string }[] = [
   { num: '3', titulo: 'Empezás a vender', desc: 'Compartís tu link (vintoapp.com/tu-negocio) en redes o en tu perfil de WhatsApp y empezás a recibir pedidos.' },
 ]
 
-const MOCK_CATEGORIAS = ['Hamburguesas', 'Bebidas', 'Pizzas']
+function DemoPhone() {
+  const [montar, setMontar] = useState(false)
+  const [cargado, setCargado] = useState(false)
 
-export default function LandingPage() {
-  const [productosDemo, setProductosDemo] = useState<Producto[] | null>(null)
-
+  // Montar el iframe recién después del load de la landing para no competir con el render inicial
   useEffect(() => {
-    let activo = true
-    getMenu(DEMO_URL.replace(/^\//, ''))
-      .then(menu => {
-        if (!activo) return
-        const todos = menu.categorias.flatMap(c => c.productos)
-        // Priorizar los que tienen foto, después el resto, y tomar los primeros 3
-        const conFoto = todos.filter(p => p.imagenUrl)
-        const sinFoto = todos.filter(p => !p.imagenUrl)
-        setProductosDemo([...conFoto, ...sinFoto].slice(0, 3))
-      })
-      .catch(() => {
-        // La API está en tier gratis y puede tardar/fallar: dejamos el fallback gris
-      })
-    return () => {
-      activo = false
+    if (document.readyState === 'complete') {
+      const t = window.setTimeout(() => setMontar(true), 0)
+      return () => window.clearTimeout(t)
     }
+    const onLoad = () => setMontar(true)
+    window.addEventListener('load', onLoad, { once: true })
+    return () => window.removeEventListener('load', onLoad)
   }, [])
 
+  const handleLoad = (e: SyntheticEvent<HTMLIFrameElement>) => {
+    setCargado(true)
+    // Mismo origen: interceptamos el primer clic/tap dentro de la tienda y lo mandamos a una pestaña nueva.
+    // El scroll no genera "click", así que recorrer el menú sigue funcionando.
+    try {
+      const doc = e.currentTarget.contentDocument
+      if (!doc) return
+      doc.addEventListener(
+        'click',
+        ev => {
+          ev.preventDefault()
+          ev.stopPropagation()
+          window.open(DEMO_URL, '_blank', 'noopener,noreferrer')
+        },
+        true,
+      )
+      // Dejar que el gesto vertical encadene al scroll de la landing al llegar al borde del menú
+      doc.documentElement.style.overscrollBehaviorY = 'auto'
+      doc.body.style.cursor = 'pointer'
+      // Ocultar la barra de scroll del teléfono sin perder el scroll
+      const estilo = doc.createElement('style')
+      estilo.textContent = 'html{scrollbar-width:none}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none}'
+      doc.head.appendChild(estilo)
+    } catch {
+      // Si el documento no es accesible, el CTA primario sigue llevando a la tienda
+    }
+  }
+
+  return (
+    <div className="w-full flex flex-col items-center" style={{ maxWidth: '320px' }}>
+    <div className="bg-[#1a1a1a] p-2 rounded-[36px] w-full">
+      <div className="relative bg-[#faf8f4] rounded-[28px] overflow-hidden h-[440px] md:h-[560px]">
+        {/* Placeholder mientras carga */}
+        <div
+          className="absolute inset-0 flex flex-col items-center px-5 pt-8 transition-opacity duration-300"
+          style={{ opacity: cargado ? 0 : 1, pointerEvents: 'none' }}
+          aria-hidden="true"
+        >
+          <p className="text-[10px] font-medium uppercase tracking-widest" style={{ color: '#2d5a27' }}>
+            Abierto ahora
+          </p>
+          <p className="mt-3 text-[#1a1a1a]" style={{ fontFamily: SERIF, fontSize: '26px', fontWeight: 400 }}>
+            Ejemplo
+          </p>
+          <div className="mt-3 mb-5" style={{ width: '24px', height: '1.5px', backgroundColor: '#73223a' }} />
+          <div className="w-full flex flex-col gap-2">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="bg-white p-3" style={{ border: '0.5px solid #e8e1d4' }}>
+                <div className="w-full animate-pulse" style={{ height: '54px', backgroundColor: '#ede5d3' }} />
+                <div className="mt-2 animate-pulse" style={{ height: '10px', width: '55%', backgroundColor: '#ede5d3' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {montar && (
+          <iframe
+            src={DEMO_URL}
+            title="Vista previa de la tienda demo de Vinto. Tocá para abrirla en una pestaña nueva."
+            loading="lazy"
+            tabIndex={-1}
+            onLoad={handleLoad}
+            className="absolute inset-0 w-full h-full border-0 transition-opacity duration-300"
+            style={{ opacity: cargado ? 1 : 0 }}
+          />
+        )}
+      </div>
+    </div>
+    <p className="mt-4 text-center text-[#6b6258]" style={{ fontSize: '12.5px', lineHeight: 1.5 }}>
+      Una tienda real, funcionando. Tocala para abrirla.
+    </p>
+    </div>
+  )
+}
+
+export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#faf8f4] text-[#1a1a1a]">
 
@@ -72,10 +137,6 @@ export default function LandingPage() {
 
           {/* Izquierda — texto */}
           <div className="w-full md:w-3/5">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] mb-4" style={{ color: '#73223a' }}>
-              Vinto · Comercio online
-            </p>
-            <div className="mb-6" style={{ width: '32px', height: '1.5px', backgroundColor: '#73223a' }} />
             <h1
               className="text-[#1a1a1a] mb-5"
               style={{ fontFamily: SERIF, fontWeight: 400, lineHeight: 1.1, letterSpacing: '-0.01em', fontSize: 'clamp(36px, 5vw, 56px)' }}
@@ -87,74 +148,28 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <a
-                href={WHATSAPP_URL}
+                href={DEMO_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block bg-[#73223a] hover:bg-[#651d33] text-[#faf8f4] px-7 py-3.5 text-[11px] font-medium uppercase tracking-[0.18em] rounded-none transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
               >
-                Quiero mi tienda
+                Ver la tienda demo
+                <span className="sr-only"> (se abre en una pestaña nueva)</span>
               </a>
-              <Link
-                to={DEMO_URL}
+              <a
+                href={WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-block py-3.5 pl-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[#6b6258] hover:text-[#73223a] transition-colors"
               >
-                Ver un ejemplo →
-              </Link>
+                Escribime por WhatsApp
+              </a>
             </div>
           </div>
 
-          {/* Derecha — mockup del MenuPage */}
+          {/* Derecha — tienda demo real */}
           <div className="w-full md:w-2/5 flex justify-center">
-            <div
-              className="w-full bg-[#ede5d3] p-5 rounded-3xl vinto-float"
-              style={{ maxWidth: '320px', aspectRatio: '4 / 5' }}
-            >
-              <div className="h-full flex flex-col">
-                <p className="text-[10px] font-medium uppercase tracking-widest text-center" style={{ color: '#2d5a27' }}>
-                  Abierto ahora
-                </p>
-                <h2
-                  className="text-center mt-3 text-[#1a1a1a]"
-                  style={{ fontFamily: SERIF, fontSize: '26px', fontWeight: 400 }}
-                >
-                  Ejemplo
-                </h2>
-                <div className="mx-auto mt-3 mb-5" style={{ width: '24px', height: '1.5px', backgroundColor: '#73223a' }} />
-                <div className="flex flex-col gap-2">
-                  {productosDemo
-                    ? productosDemo.map(p => (
-                        <div key={p.id} className="bg-white p-3" style={{ border: '0.5px solid #e8e1d4' }}>
-                          {p.imagenUrl ? (
-                            <div
-                              className="w-full bg-cover bg-center"
-                              style={{ height: '54px', backgroundImage: `url(${resolveImageUrl(p.imagenUrl)})` }}
-                            />
-                          ) : (
-                            <div className="w-full" style={{ height: '54px', backgroundColor: '#d9cdb3' }} />
-                          )}
-                          <div className="mt-2 flex items-baseline justify-between gap-2">
-                            <p className="text-[#1a1a1a]" style={{ fontFamily: SERIF, fontSize: '14px', fontWeight: 400 }}>
-                              {p.nombre}
-                            </p>
-                            {p.precio != null && (
-                              <p className="text-[#73223a] shrink-0" style={{ fontFamily: SERIF, fontSize: '13px', fontWeight: 400 }}>
-                                ${p.precio.toLocaleString('es-AR')}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    : MOCK_CATEGORIAS.map(nombre => (
-                        <div key={nombre} className="bg-white p-3" style={{ border: '0.5px solid #e8e1d4' }}>
-                          <div className="w-full" style={{ height: '54px', backgroundColor: '#d9cdb3' }} />
-                          <p className="mt-2 text-[#1a1a1a]" style={{ fontFamily: SERIF, fontSize: '14px', fontWeight: 400 }}>
-                            {nombre}
-                          </p>
-                        </div>
-                      ))}
-                </div>
-              </div>
-            </div>
+            <DemoPhone />
           </div>
 
         </div>
