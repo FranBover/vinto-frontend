@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import { loginAdmin } from '../../api/adminApi'
 import { useAuthStore } from '../../store/authStore'
@@ -21,8 +22,12 @@ export default function LoginPage() {
       const { token } = await loginAdmin(email.trim(), password)
       guardarToken(token)
       navigate('/admin/pedidos', { replace: true })
-    } catch {
-      setError('Email o contraseña incorrectos.')
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
+        setError('Demasiados intentos. Esperá unos minutos antes de volver a probar.')
+      } else {
+        setError('Email o contraseña incorrectos.')
+      }
       setLoading(false)
     }
   }
