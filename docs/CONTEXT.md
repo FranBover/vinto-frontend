@@ -3,7 +3,7 @@
 Documento de referencia largo. Para las reglas cortas de trabajo ver
 [`../CLAUDE.md`](../CLAUDE.md).
 
-Estado verificado contra el código al 2026-08-20 (branch `main`, commit `be30fde`).
+Estado verificado contra el código al 2026-10-07 (branch `main`, commit `dd77ce7`).
 
 ---
 
@@ -17,8 +17,13 @@ de React sirve a todos los tenants:
 - `vinto/admin/...` → panel de gestión del dueño del local
 - `vinto/` → landing de marketing del producto
 
+El producto es **multi-rubro** (gastronomía, ropa, kioscos…): por eso hay
+variantes con stock y el copy de la landing no habla solo de "menú".
+
 No hay build por tenant, ni subdominios, ni configuración por cliente en el
 frontend. **Todo lo específico del local llega en el payload de `getMenu(slug)`.**
+El slug público de un local lo define el backend (`Administrador.slugLocal`) y el
+dueño puede cambiarlo desde "Mi local" (§8.3).
 
 El backend es una API .NET separada (repositorio aparte) que expone REST + un hub
 de SignalR.
@@ -36,9 +41,11 @@ src/
 │   └── mercadoPagoApi.ts  preferencia de pago y polling de estado
 ├── components/
 │   ├── admin/          layout, sidebar, modales, uploader, secciones
+│   │   │               (ConexionIndicador, SeccionUrlPublica, ...)
 │   │   └── reportes/   gráficos Recharts + paleta
 │   ├── client/         CartBar, CuponInput, BannerDescuentos
-│   ├── DireccionAutocomplete.tsx   (compartido: se usa en checkout)
+│   ├── DireccionAutocomplete.tsx   Leaflet + Nominatim; SOLO vía lazy (§5.1)
+│   ├── RouteFallback.tsx           fallback del Suspense global
 │   └── NuevoPedidoToast.tsx
 ├── hooks/
 │   ├── usePedidosHub.ts  conexión SignalR
@@ -48,14 +55,14 @@ src/
 │   ├── admin/      panel
 │   └── marketing/  LandingPage
 ├── store/          Zustand: auth, cart, menu, notifications
-├── types/index.ts  TODOS los modelos y DTOs del dominio, en un archivo
+├── types/index.ts  modelos y DTOs del dominio (los de admin, en adminApi.ts)
 ├── config.ts       URLs de entorno + resolveImageUrl + constantes de marketing
 ├── index.css       @import "tailwindcss" + una animación
 └── main.tsx        createRoot + StrictMode
+public/             og-image.png, íconos, staticwebapp.config.json
 ```
 
-No existen `components/ui/` ni `utils/` (el README viejo los mencionaba; era
-incorrecto).
+No existen `components/ui/` ni `utils/`.
 
 ---
 
@@ -80,14 +87,15 @@ backend hardcodeado en `src/`.
 
 `config.ts` también exporta dos constantes de marketing usadas solo por la
 landing: `WHATSAPP_URL` (link de contacto comercial) y `DEMO_URL` (`'/ejemplo'`,
-el slug del local de demostración que la landing consulta para mostrar productos
-reales).
+la ruta del local de demostración, que la landing **embebe en un iframe** y
+también abre en pestaña nueva; ver §8.4).
 
 ### Archivos de entorno
 
 | Archivo | Versionado | Contenido |
 |---|---|---|
 | `.env` | No (`.gitignore`) | `VITE_API_URL`, `VITE_BASE_URL` locales |
+| `.env.development` | **No, y tampoco ignorado** (aparece como `??` en `git status`) | idem, para `npm run dev` |
 | `.env.production` | Sí | `VITE_API_URL`, `VITE_BASE_URL` de producción |
 | `.env.example` | Sí | plantilla — **hoy incompleta, ver §11** |
 
@@ -119,11 +127,19 @@ Una sola instancia de Axios compartida por los tres módulos de API.
   `localStorage` y lo inyecta como `Authorization: Bearer`. Lee de
   `localStorage` y no del store para poder correr fuera del árbol de React.
 - **Response interceptor:** ante un `401` llama a
-  `useAuthStore.getState().logout()`. El logout limpia el token; el
-  `ProtectedRoute` reacciona y redirige a `/admin/login`.
+  `useAuthStore.getState().expirarSesion()` — **salvo si la URL incluye
+  `/auth/login`**: ahí un 401 son credenciales incorrectas, no una sesión
+  vencida. `expirarSesion` limpia el token y marca `sesionExpirada`; el
+  `ProtectedRoute` reacciona y redirige a `/admin/login`, que muestra el aviso
+  "Tu sesión expiró".
 
 No hay retry, ni normalización de errores, ni tipado de error. Cada página
 maneja su `try/catch` y arma su propio mensaje en español.
+
+**Login (`LoginPage`):** distingue **429** (`axios.isAxiosError` + status →
+"Demasiados intentos. Esperá unos minutos…", el backend aplica rate limit) de
+cualquier otro fallo (→ "Email o contraseña incorrectos."). Con 401 y 429 por
+separado, un bloqueo por rate limit ya no se lee como contraseña mala.
 
 ### Endpoints por módulo
 
@@ -136,7 +152,10 @@ maneja su `try/catch` y arma su propio mensaje en español.
 - `POST /public/locales/{slug}/pedidos/{pedidoId}/preferencia-mp`
 - `GET  /public/pedidos/{codigoSeguimiento}/estado-pago`
 
-**`adminApi.ts`** (JWT) — auth, pedidos + comanda/ticket + comentarios,
+**`adminApi.ts`** (JWT) — auth, pedidos (**paginados**: `getPedidos(adminId,
+filtros, page, pageSize)` → `{ items, total, page, pageSize, totalPages }`) +
+comanda/ticket + comentarios, datos del local (`updateLocalData`, incluye
+`slugLocal`),
 productos, categorías (con reordenamiento), extras, variantes (tipos, opciones,
 generación combinatoria), stock (alertas, ajuste, alta), descuentos, cupones
 (+ métricas), imágenes (upload/list/delete), reportes, y conexión OAuth de
@@ -154,8 +173,11 @@ El casing de las rutas es mixto y refleja el backend tal cual:
 
 ## 5. Ruteo (`src/App.tsx`)
 
-`BrowserRouter`, sin lazy loading — todas las páginas se importan de forma
-estática, así que el bundle es único.
+`BrowserRouter` con **code splitting por ruta**: las 20 páginas se cargan con
+`React.lazy` y un único `<Suspense fallback={<RouteFallback />}>` envuelve todo
+el `<Routes>`. `RouteFallback` es una pantalla crema con "Cargando…" en Fraunces
+cursiva. Resultado: la landing y el menú público no descargan Recharts, dnd-kit
+ni el panel admin.
 
 ```
 /                                              LandingPage (marketing)
@@ -183,10 +205,21 @@ estática, así que el bundle es único.
 *                                              → /admin/login
 ```
 
-**`ProtectedRoute`** es un `<Outlet>` condicionado a
-`useAuthStore(s => s.isAuthenticated)()`. Solo verifica que exista un token en
-memoria; **no valida expiración ni firma**. La expiración real se detecta
-recién cuando la API devuelve 401 y el interceptor hace logout.
+**`ProtectedRoute`** (definido en `App.tsx`) se suscribe a `s.token` y renderiza
+`<Outlet>` o `<Navigate to="/admin/login">`. Además **vigila la expiración del
+JWT**: lee el claim `exp` (`getTokenExpMs`), arma un `setTimeout` hasta ese
+instante (tope `2**31-1` ms) y re-chequea en `visibilitychange`, porque los
+timers se atrasan con la pestaña en segundo plano o la PC suspendida. Al vencer
+llama `expirarSesion()`. No valida la **firma** (eso es del backend), solo `exp`.
+Si el token no trae `exp` no hay vigilancia y queda el 401 como red de seguridad.
+
+### 5.1 `DireccionAutocomplete` lazy
+
+`CheckoutPage` importa `DireccionAutocomplete` con `lazy()` y lo renderiza dentro
+de su propio `<Suspense>` **solo cuando `formaEntrega === 'Delivery'`**. Es el
+único consumidor de Leaflet/react-leaflet (+ CSS e imágenes de markers) y de las
+consultas a Nominatim, así que quien retira en el local nunca baja ese código.
+Un import estático lo metería de vuelta en el chunk del checkout.
 
 **El catch-all `*` redirige a `/admin/login`**, no a un 404 ni a la landing.
 Consecuencia: un slug de local inexistente no cae en el catch-all (matchea
@@ -247,14 +280,22 @@ Persistido en `localStorage` bajo `vinto-cart` vía el middleware `persist`.
 
 ### `authStore.ts` — sesión del admin
 
+- Estado: `token`, `adminId`, `sesionExpirada`.
 - Token en `localStorage` bajo `vinto_admin_token`.
-- `adminId` se **decodifica del payload del JWT** con `atob`, probando
-  `adminId`, luego `sub`, luego `nameid`. Sin librería, con `try/catch` que
-  devuelve `null`. Es decodificación, no validación.
-- `isAuthenticated()` es `token !== null`.
-- El estado inicial se hidrata de forma síncrona desde `localStorage` en la
-  definición del store, así que un refresh en `/admin/pedidos` no parpadea al
-  login.
+- El payload del JWT se **decodifica** con `atob` (sin librería, `try/catch` →
+  `null`): `adminId` probando `adminId`, `sub`, `nameid`; y el claim `exp`
+  (`getTokenExpMs`, exportado, lo usa `ProtectedRoute`). Es decodificación, no
+  validación de firma.
+- **Hidratación síncrona con chequeo de vencimiento:** al crear el store se lee
+  `localStorage`; si el token ya venció se borra y arranca con
+  `sesionExpirada: true` (el login muestra "Tu sesión expiró"). Un refresh en
+  `/admin/pedidos` con token vigente no parpadea al login.
+- `expirarSesion()` es el **único camino de cierre por vencimiento** (timer de
+  `ProtectedRoute`, 401 del interceptor, carga inicial). Es no-op si ya no hay
+  token. `logout()` es el cierre voluntario y no marca `sesionExpirada`.
+  `guardarToken` la resetea a `false`.
+- `isAuthenticated()` es `token !== null && !tokenVencido(token)`. Hoy nadie la
+  consume: `ProtectedRoute` se suscribe directo a `token`.
 
 ### `notificationsStore.ts` — eventos en tiempo real
 
@@ -264,6 +305,12 @@ Es el puente entre SignalR y la UI. Guarda:
 - `ultimoNuevoPedido` / `ultimoPagoConfirmado`: último payload de cada tipo, para
   que una página suscripta pueda reaccionar (por ejemplo, refrescar la lista de
   pedidos) sin acoplarse al toast.
+- `reconexiones`: contador que `emitirReconexion()` incrementa tras una
+  reconexión **real** del hub. `PedidosPage` lo observa para volver a pedir la
+  lista (§7).
+- `avisarPedidosPerdidos(payloads)`: agrega toasts de pedidos que entraron
+  durante una caída. **A propósito no toca `ultimoNuevoPedido`**, para no
+  disparar un refetch adicional.
 
 ---
 
@@ -277,9 +324,21 @@ Es el puente entre SignalR y la UI. Guarda:
   withCredentials: true,
   accessTokenFactory: () => localStorage.getItem('vinto_admin_token') ?? '',
 })
-.withAutomaticReconnect()
+.withAutomaticReconnect({
+  nextRetryDelayInMilliseconds: ({ previousRetryCount }) =>
+    [0, 2000, 10000][previousRetryCount] ?? 30000,
+})
 ```
 
+- **La reconexión no se rinde.** El default de SignalR reintenta 4 veces (0, 2,
+  10, 30 s) y queda `Disconnected` en silencio. Acá, tras los primeros
+  intentos sigue **cada 30 s indefinidamente**. Además, `withAutomaticReconnect`
+  solo cubre conexiones que llegaron a establecerse: si el `start()` inicial
+  falla, o el servidor cierra (`onclose`), el hook reintenta a mano con
+  `setTimeout` cada 5 s (cancelable en el cleanup del efecto).
+- **`onReconectado`:** callback opcional que se dispara solo tras recuperarse de
+  un corte real (flag `huboCorte` en el closure del efecto), **nunca en la
+  conexión inicial limpia**. `AdminLayout` lo conecta a `emitirReconexion`.
 - **Eventos recibidos:** `NuevoPedido` y `PagoConfirmado`. Sus payloads están
   tipados en `notificationsStore.ts` (`NuevoPedidoPayload`,
   `PagoConfirmadoPayload`) — es el único lugar donde viven contratos del hub.
@@ -292,11 +351,27 @@ Es el puente entre SignalR y la UI. Guarda:
   ambos handlers con `useCallback` y los enchufa a las acciones del
   `notificationsStore`. Como todas las páginas admin se renderizan dentro de
   `AdminLayout`, hay exactamente una conexión mientras el admin navega.
-- **Estado expuesto:** `connectionState` (`HubConnectionState`). Hoy ninguna
-  página lo consume: no hay indicador visual de "desconectado".
-- Un fallo de `start()` deja el estado en `Disconnected` en silencio. No hay
-  reintento manual más allá del `withAutomaticReconnect` de SignalR (que solo
-  actúa sobre conexiones que llegaron a establecerse).
+- **Estado expuesto:** `connectionState` (`HubConnectionState`), que
+  `AdminLayout` pasa a `ConexionIndicador.tsx`:
+  - `ConexionChip` (header): "En vivo" (verde) / "Reconectando…" (vino,
+    pulsando) / "Sin conexión" (rojo).
+  - `ConexionBanner` (a ancho completo bajo el header): aparece **solo** en
+    `Reconnecting` y `Disconnected`. `Connecting` no muestra banner: es el
+    handshake normal al montar cada página (el hub se recrea al navegar).
+
+### Refetch al reconectar y diff de pedidos perdidos
+
+SignalR no reenvía lo emitido mientras el cliente estaba caído. Al subir
+`reconexiones`, `PedidosPage` hace `fetchPedidos(true)`:
+
+- Compara los ids de la nueva lista contra `idsPrevios` (ids de la última carga
+  exitosa) y lanza un toast por cada pedido que no estaba (máx. 5,
+  `MAX_AVISOS_RECONEXION`); la lista igual los muestra todos.
+- **El diff solo es válido en página 1 sin filtros** (`esVistaEnVivo`): ahí caen
+  los pedidos nuevos (el backend ordena fecha DESC, id DESC). En otra página o
+  con filtros, `idsPrevios` se invalida (`null`) y no se avisa nada.
+- `reconexionesVistas` arranca en el valor actual del contador: una reconexión
+  anterior al montaje de la página no cuenta.
 
 Los toasts se apilan en un contenedor `position: fixed` abajo a la derecha,
 renderizado por `AdminLayout`.
@@ -320,8 +395,10 @@ renderizado por `AdminLayout`.
 4. **`CarritoPage`** — edición de cantidades, `CuponInput` no aparece acá.
 5. **`CheckoutPage`** — es la página más densa del repo:
    - datos del cliente (nombre, teléfono);
-   - **entrega**: `Local` (retiro) o `Delivery`. En delivery aparece
-     `DireccionAutocomplete` y un selector de *tipo de edificación*
+   - **entrega**: `Retira` (retiro en el local; es el valor por defecto) o
+     `Delivery`. **El valor del contrato con la API es `'Retira'`**, no
+     `'Local'` (commit `e67a478`); la UI lo etiqueta "Retiro en local". En
+     delivery aparece `DireccionAutocomplete` (lazy, §5.1) y un selector de *tipo de edificación*
      (Casa / Barrio cerrado / Edificio / Centro comercial / Otro) que despliega
      campos condicionales. Todo eso se **aplana en un único string
      `referenciaDireccion`** antes de enviarse (ej.
@@ -361,6 +438,17 @@ MercadoPago redirige de vuelta a `/:slug/pago/{success|failure|pending}?codigo=.
   carrito** (el pedido ya existe en el backend).
 - Errores de red durante el polling se ignoran y se sigue intentando.
 
+**Sin datos personales del cliente.** Las tres páginas de pago (`Success`,
+`Failure`, `Pending`) solo conocen lo que devuelve `estado-pago`
+(`EstadoPagoPublicoResponse`: `encontrado`, `estado`, `mercadoPagoStatus`,
+`total`, `linkWhatsapp`). Ese endpoint es público y se consulta con el código de
+seguimiento, así que no devuelve nombre, teléfono ni dirección (se sacaron de
+`EstadoPagoPublicoResponse` en el commit `fba7228`). El mensaje de WhatsApp se
+arma en el cliente con **solo el código** (`Hola, consulto por mi pedido #<código>`).
+Quien tenga el código ve el total y el estado, nada más. La excepción es
+`ConfirmacionPage` (flujo efectivo/transferencia), que recibe todo por
+`location.state` desde el checkout y no pasa por la red.
+
 El carrito **no** se vacía en el checkout, precisamente porque el pago puede
 fallar: se limpia en `PagoSuccess`/`PagoPending`, o al contactar por WhatsApp
 desde `PagoFailure`.
@@ -372,9 +460,96 @@ muestra el toast sin refrescar.
 
 Login → JWT en `localStorage` → `adminId` decodificado del token → todas las
 llamadas admin lo usan como parámetro o lo derivan del token en el backend.
-`AdminLayout` monta la conexión SignalR, el banner de estado de MercadoPago y
-el stack de toasts. Sidebar fija de 200px; el contenido lleva
-`marginLeft: 200`.
+`AdminLayout` monta la conexión SignalR, el chip y el banner de conexión
+(`ConexionIndicador`), el banner de estado de MercadoPago y el stack de toasts.
+Sidebar fija de 200px; el contenido lleva `marginLeft: 200`.
+
+**`PedidosPage` — paginación.** 25 pedidos por página (`PAGE_SIZE`), página y
+filtros en estado local; el backend responde `{ items, total, totalPages }`.
+Controles Anterior / números (primera, última y ±1 de la actual, con "…") /
+Siguiente. Detalles que importan:
+
+- **Descarte de respuestas viejas:** un `requestId` en `useRef` se incrementa en
+  cada fetch; si al volver la respuesta ya no es la última (el admin cambió de
+  página o de filtros mientras cargaba) se ignora, tanto en `then` como en
+  `catch`.
+- **Página fuera de rango:** si la página pedida quedó vacía pero hay
+  resultados (se achicó la lista), salta a `totalPages`.
+- Aplicar filtros vuelve a la página 1 e invalida `idsPrevios`.
+- Se refetchea con cada `ultimoNuevoPedido` / `ultimoPagoConfirmado` y al
+  reconectar (con el diff de §7).
+- Las opciones de filtro de forma de entrega son `Delivery` y `Retira`.
+
+**`MiLocalPage` → `SeccionUrlPublica`.** Muestra el link público
+(`window.location.origin + '/' + admin.slugLocal`), con "Copiar link" y "Cambiar
+URL". Cambiarlo exige una advertencia explícita (rompe QR impresos, links de
+Instagram/WhatsApp) y se guarda con `updateLocalData(..., { slugLocal })`, o sea
+el mismo `PATCH /Administrador/{id}/local` del resto del formulario, reenviando
+los **datos ya guardados** del local (no los cambios sin guardar del form). Si
+el backend rechaza el slug, se muestra su `mensaje`. El slug lo valida y lo
+mantiene único el backend; el frontend no valida formato.
+
+### 8.4 Landing (`/`)
+
+Página de marketing, toda en el lenguaje crema/Fraunces/vino. Estructura:
+
+1. **Hero** (texto + teléfono con la tienda demo). Dos CTA: "Ver la tienda demo"
+   (abre `DEMO_URL` en pestaña nueva) y "Escribime por WhatsApp".
+2. **5 features** (`FEATURES`): catálogo en minutos; pedido por WhatsApp con
+   vuelto calculado; cobro con MercadoPago (el dinero entra directo a la cuenta
+   del local); cliente pide sin registro; gestión desde el celular. Debajo, dos
+   líneas secundarias (`EXTRAS`): descuentos/cupones y estadísticas.
+3. **Cómo arranca** en 3 pasos (hablamos → configuramos → empezás a vender).
+4. **CTA final** y footer.
+
+El copy es **multi-rubro** ("gastronomía, ropa, kioscos o lo que vendas").
+
+**`DemoPhone`: ver, no operar.** Un marco de teléfono con un `<iframe>` a
+`DEMO_URL` (`/ejemplo`, mismo origen). Decisiones:
+
+- El iframe se monta **después del `load` de la landing** para no competir con
+  el render inicial, y es `loading="lazy"`; mientras tanto hay un placeholder
+  con skeletons.
+- Al cargar, se inyecta un listener de `click` en **captura** dentro del
+  documento del iframe: el primer clic/tap hace `preventDefault` y abre la
+  demo en pestaña nueva. Navegar el scroll sigue funcionando (el scroll no
+  genera `click`). Por eso la demo no se puede operar (agregar al carrito,
+  etc.) embebida.
+- También se oculta la barra de scroll y se deja encadenar el scroll al de la
+  landing. Todo en `try/catch`: si el documento no es accesible, el CTA sigue
+  llevando a la tienda.
+- `tabIndex={-1}` y `title` descriptivo para accesibilidad.
+- **Dependencia operativa:** el slug `ejemplo` tiene que existir en el backend
+  de cada entorno, o el hero muestra un error de carga dentro del teléfono.
+
+**Metadatos para compartir (`index.html`).** `description`, Open Graph
+(`og:type/url/title/description/image` + tamaño 1200×630 y `alt`) y Twitter
+Card `summary_large_image`. La imagen es `public/og-image.png`, referenciada por
+URL absoluta (`https://vintoapp.com/og-image.png`): los crawlers sociales
+necesitan URL absoluta. Si cambia el dominio de producción hay que tocar esas
+tres URLs a mano (`og:url`, `og:image`, `twitter:image`).
+
+### 8.5 Sistema de diseño: dos lenguajes
+
+| | Cliente + landing | Panel admin |
+|---|---|---|
+| Fondo | `#faf8f4` crema | `#fafaf9` |
+| Tipografía | `Fraunces` (display) | sans del sistema, **sin Fraunces** |
+| Acento / CTA | vino `#73223a` (hover `#651d33`) | botón primario `#1a1a1a` |
+| Bordes | `#e8e1d4` (cálido) | `#e8e8e8`, `#d0d0d0` |
+| Superficie | `#ede5d3` | blanco |
+| Orientación | mobile-first | desktop-first, sidebar 200px |
+
+Comunes: texto `#1a1a1a`, secundario `#6b6258`, positivo `#2d5a27`, error
+`#a92020`, `rounded-none`, sin gradientes. Las fuentes se cargan por Google
+Fonts desde `index.html`.
+
+**Excepciones reales en admin** (el código no es 100 % consistente): 
+`SeccionUrlPublica` usa crema, vino y Fraunces; `ConexionIndicador` usa vino y
+`#ede5d3`; el botón "Guardar cambios" de Mi local es verde `#2d5a27`. No son el
+patrón a seguir para pantallas admin nuevas.
+
+El `LoginPage` es admin: `#fafaf9`, logo cuadrado negro, sin vino ni Fraunces.
 
 ---
 
@@ -436,15 +611,10 @@ build**. `tsconfig.app.json` tiene `strict`, `noUnusedLocals`,
 
 ### CI/CD
 
-Hay **dos** pipelines versionados, apuntando a destinos distintos:
-
-| Archivo | Destino | Estado |
-|---|---|---|
-| `.github/workflows/azure-static-web-apps-*.yml` | Azure Static Web Apps (`app_location: /`, `output_location: dist`), build en la nube de Azure | activo — es el que se usa |
-| `azure-pipeline.yml` | Azure DevOps → Azure Web App Linux, `pm2 serve --spa` | aparentemente legacy |
-
-El commit `5469eee` ("Merge: integrar workflow de Azure SWA") sugiere que SWA
-reemplazó al pipeline de DevOps, pero el archivo viejo quedó. Ver §11.
+Hay **un** pipeline: `.github/workflows/azure-static-web-apps-*.yml` → Azure
+Static Web Apps (`app_location: /`, `output_location: dist`), build en la nube
+de Azure. El `azure-pipeline.yml` de Azure DevOps (App Service + `pm2 serve`)
+se eliminó en `694d9e9`.
 
 Como el build de SWA corre en Azure, `.env.production` (versionado) es lo que
 define las URLs del bundle de producción.
@@ -453,73 +623,81 @@ define las URLs del bundle de producción.
 
 ## 11. Deuda técnica y contradicciones detectadas
 
-Inventario del estado real, sin cambios aplicados.
+Inventario del estado real al 2026-10-07, sin cambios aplicados al código.
 
-### Confirmadas
+### Entorno y repo
 
 1. **`.env.example` desalineado.** Declara una sola variable, `VITE_API_URL`,
    con un valor **sin el sufijo `/api`** que el `baseURL` de Axios necesita, y
-   **omite `VITE_BASE_URL` por completo**. Alguien que clone el
-   repo y copie el ejemplo obtiene 404 en cada llamada y las imágenes y SignalR
-   rotos. Debería declarar las dos variables, con `/api` en la primera.
-2. **`.env.example` está en UTF-16 LE con BOM y CRLF.** `.env` local también.
-   Vite parsea `.env` con `dotenv`, que asume UTF-8: el BOM UTF-16 puede hacer
-   que la primera clave se lea con basura al principio o directamente no se
-   lea. Deberían ser UTF-8 sin BOM.
-3. **`updateAdministrador` es código muerto.** Declarada en `adminApi.ts:133`,
-   sin ningún call site en `src/`. `MiLocalPage` usa `updateLocalData`
-   (`PATCH /Administrador/{id}/local`). Además `updateAdministrador` es la única
-   ruta escrita en minúscula (`/administrador/{id}`) y su payload tiene
-   `esAbierto`, un campo que el resto del panel ya no toca.
-4. **Falta `.gitattributes`.** `core.autocrlf` está en `true` en la máquina de
-   desarrollo, y en el repo conviven finales de línea mixtos: `src/config.ts`,
-   `.env.example` y el workflow de GitHub Actions están commiteados con CRLF; el
-   resto del código, con LF. Sin `.gitattributes`, cada clon en otro sistema
-   puede producir diffs completos de archivos sin cambios reales.
+   **omite `VITE_BASE_URL`**. Quien copie el ejemplo obtiene 404 en cada
+   llamada y las imágenes y SignalR rotos. Debería declarar las dos variables,
+   con `/api` en la primera.
+2. **`.env.example` está en UTF-16 LE con BOM y CRLF** (verificado por bytes:
+   `ff fe` al inicio). Vite parsea con `dotenv`, que asume UTF-8: la primera
+   clave puede leerse con basura o no leerse. Debería ser UTF-8 sin BOM.
+3. **`.env.development` ni versionado ni ignorado.** `.gitignore` solo cubre
+   `.env`, así que `git status` lo muestra como `??`. Decidir: ignorarlo
+   (`.env.development`) o versionarlo si solo lleva URLs locales. Hoy un
+   `git add .` lo commitea por accidente.
+4. **Falta `.gitattributes`.** `core.autocrlf=true` en la máquina de desarrollo
+   y finales de línea mixtos en el repo: `src/config.ts`, `.env.example` y el
+   workflow de GitHub están en CRLF; el resto, en LF.
 
-### Otras encontradas durante la revisión
+### Código
 
-5. **La documentación previa contradecía al código.** El `CLAUDE.md` y el
-   `README.md` anteriores describían un sistema de diseño que ya no existe
-   (fondo blanco, tipografía Helvetica Neue, acento verde `#2d5a27`). El código
-   real usa fondo crema `#faf8f4`, tipografía `Fraunces` (cargada por Google
-   Fonts en `index.html`) y acento vino `#73223a` (61 ocurrencias). El verde
-   quedó relegado a indicadores positivos (montos de descuento, toggle de local
-   abierto). Corregido en esta pasada de documentación.
-6. **El README previo decía que las imágenes se gestionan "mediante URLs
-   externas, se recomienda Cloudinary".** Falso desde que existe
-   `ImageUploader` + el endpoint `/Imagenes/upload`. También describía carpetas
-   `components/ui/` y `utils/` que no existen.
-7. **`src/pages/client/ProductosCategoriaPage.tsx` es un stub muerto**: un
-   componente de tres líneas que devuelve `<div>ProductosCategoriaPage</div>`,
-   sin importarse en ningún lado.
-8. **Assets sin uso**: `src/App.css` no lo importa nadie (`main.tsx` solo
-   importa `index.css`), y `src/assets/hero.png`, `react.svg` y `vite.svg` no
-   están referenciados.
-9. **Dos pipelines de despliegue coexisten** (§10). `azure-pipeline.yml`
-   despliega a un App Service con `pm2 serve` mientras el workflow de GitHub
-   despliega a Static Web Apps. Solo uno debería quedar.
-10. **DTOs repartidos en dos lugares.** `types/index.ts` se documenta como "todos
-    los modelos del dominio", pero descuentos, cupones, comanda, ticket, stock y
-    comentarios están declarados dentro de `adminApi.ts`.
-11. **`ProtectedRoute` no chequea expiración del JWT.** Un token vencido deja
-    ver el shell del panel hasta que la primera llamada devuelve 401 y el
-    interceptor desloguea. Es un problema de UX, no de seguridad (el backend
-    rechaza igual).
-12. **`connectionState` de `usePedidosHub` no se consume.** El admin no tiene
-    forma de saber que dejó de recibir pedidos en tiempo real.
-13. **El catch-all `*` manda a `/admin/login`** en lugar de a un 404 o a la
+5. **`updateAdministrador` es código muerto** (`adminApi.ts`, sin call sites).
+   `MiLocalPage` usa `updateLocalData`. Además es la única ruta en minúscula
+   (`/administrador/{id}`) y su payload usa `esAbierto`, que el panel ya no usa.
+6. **`authStore.isAuthenticated()` no tiene consumidores.** `ProtectedRoute` se
+   suscribe a `token` directamente. Está bien mantenida, pero es API sin uso.
+7. **`ProductosCategoriaPage.tsx` es un stub muerto** de tres líneas, sin
+   importar en ningún lado (ni siquiera en el `lazy` de `App.tsx`).
+8. **Assets sin uso:** `src/App.css` (nadie lo importa; `main.tsx` solo importa
+   `index.css`) y `src/assets/hero.png`, `react.svg`, `vite.svg`.
+9. **DTOs repartidos en dos lugares.** Descuentos, cupones, comanda, ticket,
+   stock y comentarios viven en `adminApi.ts`, no en `types/index.ts`.
+10. **`SERIF` redeclarado en 13 archivos** (12 de cliente/marketing/compartidos
+    más `SeccionUrlPublica` en admin). Colores de marca como hex literal por
+    todo el código, sin tokens ni tema.
+11. **El catch-all `*` manda a `/admin/login`** en vez de a un 404 o a la
     landing (§5).
-14. **`SERIF` duplicado en 12 archivos** y colores de marca como literales hex
-    repartidos por todo el código, sin tokens ni tema.
-15. **Nominatim (OpenStreetMap) se consulta directo desde el navegador**, sin
-    `User-Agent` propio ni API key. Está dentro de los términos de uso para
-    volumen bajo, pero es una dependencia externa no declarada en ningún lado y
-    su rate limit degrada silenciosamente el autocompletado de direcciones (los
-    errores de red se ignoran sin avisar al usuario).
-16. **`menuStore.loading` es global, no por slug** (§6).
-17. **`ConfirmacionPage` depende de `location.state`**: un refresh pierde los
+12. **Nominatim (OpenStreetMap) se consulta directo desde el navegador**, sin
+    `User-Agent` propio ni API key. Aceptable para volumen bajo, pero su rate
+    limit degrada en silencio el autocompletado (los errores se ignoran).
+13. **`menuStore.loading` es global, no por slug** (§6).
+14. **`ConfirmacionPage` depende de `location.state`**: un refresh pierde los
     datos del pedido recién creado.
+15. **`ProtectedRoute` solo vigila tokens con claim `exp`.** Si el backend
+    emitiera un JWT sin `exp`, no habría detección proactiva (queda el 401).
+16. **El diff de pedidos perdidos tiene un hueco por diseño:** si el admin está
+    en página 2 o con filtros durante la caída, al reconectar la lista se
+    refresca pero no se avisa de los pedidos nuevos.
+17. **El hero de la landing depende de que exista el slug `ejemplo`** en el
+    backend de cada entorno (§8.4).
+18. **El dominio `vintoapp.com` aparece escrito a mano** en `index.html` (tres
+    URLs absolutas de OG/Twitter) y como texto en `LandingPage` (paso 3). No es
+    ruteo de API, pero hay que actualizarlo a mano si cambia el dominio.
+
+### Contradicciones corregidas en esta pasada
+
+La versión anterior de estos documentos afirmaba cosas que el código ya no
+cumplía. Quedan registradas para no reintroducirlas:
+
+- "Sin lazy loading, bundle único" → todas las rutas son `React.lazy`.
+- "`ProtectedRoute` no valida expiración" → vigila `exp` con timer y
+  `visibilitychange`; el store descarta tokens vencidos al cargar.
+- "Ante un 401 el interceptor hace `logout()`" → hace `expirarSesion()`, y
+  excluye `/auth/login`.
+- "`connectionState` no se consume / no hay indicador" → `ConexionIndicador`.
+- "SignalR no reintenta más allá del default" → backoff propio que no se rinde.
+- "`FormaEntrega = 'Local' | 'Delivery'`" → es `'Retira' | 'Delivery'`.
+- "Dos pipelines de despliegue conviven" → `azure-pipeline.yml` se eliminó.
+- "Sistema de diseño único (crema/Fraunces/vino, `#fafaf9` como fondo admin)"
+  → son dos lenguajes (§8.5).
+- "`DEMO_URL`: la landing consulta el local demo para mostrar productos" → la
+  landing lo embebe como iframe.
+- "No hay dominio de producción en `src/`" → hay una mención de marketing
+  (`vintoapp.com`) en `LandingPage.tsx`; sigue sin haber hosts de API.
 
 ---
 
@@ -528,7 +706,8 @@ Inventario del estado real, sin cambios aplicados.
 | Término | Significado |
 |---|---|
 | **Local** / **Administrador** | El negocio tenant. Un `Administrador` es a la vez la cuenta y el local. |
-| **slug** | Identificador público del local en la URL. |
+| **slug** / **`slugLocal`** | Identificador público del local en la URL. Lo define el backend (`Administrador.slugLocal`); el dueño lo cambia desde Mi local. |
+| **`/ejemplo`** | Local de demostración que la landing embebe en el hero. |
 | **Categoría** | Agrupación de productos, ordenable (drag & drop con dnd-kit). |
 | **Extra** | Adicional con precio sobre un producto (`ProductoExtra`). |
 | **Variante** | Combinación de opciones (ej. Talle × Color) con precio y stock propios. Se generan combinatoriamente desde el panel. |
@@ -538,5 +717,5 @@ Inventario del estado real, sin cambios aplicados.
 | **Comanda** | Ticket de cocina: qué preparar, sin precios. |
 | **Ticket** | Comprobante para el cliente: con precios, descuentos, envío y vuelto. |
 | **`resumenWhatsApp`** | Texto del pedido ya formateado por el backend para mandar por WhatsApp. |
-| **`FormaEntrega`** | `'Local'` (retiro) \| `'Delivery'`. |
+| **`FormaEntrega`** | `'Retira'` (retiro) \| `'Delivery'`. |
 | **`FormaPago`** | `'Efectivo'` \| `'Transferencia'` \| `'Tarjeta'` (se muestra como "Mercado Pago"). |
