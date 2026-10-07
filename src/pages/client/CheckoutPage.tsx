@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../../store/cartStore'
 import { useMenuStore } from '../../store/menuStore'
 import { crearPedido } from '../../api/publicApi'
 import { crearPreferenciaMP } from '../../api/mercadoPagoApi'
 import type { FormaPago, FormaEntrega, CrearPedidoDto } from '../../types'
-import DireccionAutocomplete from '../../components/DireccionAutocomplete'
 import CuponInput, { type CuponAplicado } from '../../components/client/CuponInput'
+
+// Leaflet pesa mucho y solo se usa con Delivery: se carga recién ahí.
+const DireccionAutocomplete = lazy(() => import('../../components/DireccionAutocomplete'))
 
 const SERIF = "'Fraunces', Georgia, serif"
 
@@ -288,13 +290,15 @@ export default function CheckoutPage() {
           <div className="space-y-4 mt-4">
             <div>
               <label className={labelCls}>Dirección</label>
-              <DireccionAutocomplete
-                value={direccion}
-                onChange={(d, la, lo) => { setDireccion(d); setLat(la); setLon(lo) }}
-                inputClassName={inputCls}
-                zonaEnvio={menu?.local.zonaEnvio}
-                ciudadReferencia={menu?.local.direccion}
-              />
+              <Suspense fallback={<p className="text-sm text-[#6b6258]">Cargando…</p>}>
+                <DireccionAutocomplete
+                  value={direccion}
+                  onChange={(d, la, lo) => { setDireccion(d); setLat(la); setLon(lo) }}
+                  inputClassName={inputCls}
+                  zonaEnvio={menu?.local.zonaEnvio}
+                  ciudadReferencia={menu?.local.direccion}
+                />
+              </Suspense>
             </div>
 
             {/* Tipo de edificación */}

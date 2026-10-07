@@ -1,28 +1,29 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { getTokenExpMs, useAuthStore } from './store/authStore'
+import RouteFallback from './components/RouteFallback'
 
-import LandingPage from './pages/marketing/LandingPage'
-import MenuPage from './pages/client/MenuPage'
-import ProductosPage from './pages/client/ProductosPage'
-import ExtrasPage from './pages/client/ExtrasPage'
-import CarritoPage from './pages/client/CarritoPage'
-import CheckoutPage from './pages/client/CheckoutPage'
-import ConfirmacionPage from './pages/client/ConfirmacionPage'
-import PagoSuccessPage from './pages/client/PagoSuccessPage'
-import PagoFailurePage from './pages/client/PagoFailurePage'
-import PagoPendingPage from './pages/client/PagoPendingPage'
+const LandingPage = lazy(() => import('./pages/marketing/LandingPage'))
+const MenuPage = lazy(() => import('./pages/client/MenuPage'))
+const ProductosPage = lazy(() => import('./pages/client/ProductosPage'))
+const ExtrasPage = lazy(() => import('./pages/client/ExtrasPage'))
+const CarritoPage = lazy(() => import('./pages/client/CarritoPage'))
+const CheckoutPage = lazy(() => import('./pages/client/CheckoutPage'))
+const ConfirmacionPage = lazy(() => import('./pages/client/ConfirmacionPage'))
+const PagoSuccessPage = lazy(() => import('./pages/client/PagoSuccessPage'))
+const PagoFailurePage = lazy(() => import('./pages/client/PagoFailurePage'))
+const PagoPendingPage = lazy(() => import('./pages/client/PagoPendingPage'))
 
-import LoginPage from './pages/admin/LoginPage'
-import PedidosPage from './pages/admin/PedidosPage'
-import PedidoDetallePage from './pages/admin/PedidoDetallePage'
-import AdminProductosPage from './pages/admin/ProductosPage'
-import CategoriasPage from './pages/admin/CategoriasPage'
-import ReportesPage from './pages/admin/ReportesPage'
-import MiLocalPage from './pages/admin/MiLocalPage'
-import StockPage from './pages/admin/StockPage'
-import DescuentosPage from './pages/admin/DescuentosPage'
-import CuponesPage from './pages/admin/CuponesPage'
+const LoginPage = lazy(() => import('./pages/admin/LoginPage'))
+const PedidosPage = lazy(() => import('./pages/admin/PedidosPage'))
+const PedidoDetallePage = lazy(() => import('./pages/admin/PedidoDetallePage'))
+const AdminProductosPage = lazy(() => import('./pages/admin/ProductosPage'))
+const CategoriasPage = lazy(() => import('./pages/admin/CategoriasPage'))
+const ReportesPage = lazy(() => import('./pages/admin/ReportesPage'))
+const MiLocalPage = lazy(() => import('./pages/admin/MiLocalPage'))
+const StockPage = lazy(() => import('./pages/admin/StockPage'))
+const DescuentosPage = lazy(() => import('./pages/admin/DescuentosPage'))
+const CuponesPage = lazy(() => import('./pages/admin/CuponesPage'))
 
 function ProtectedRoute() {
   // Suscribirse al token (no a la función isAuthenticated) para re-renderizar al limpiarlo.
@@ -53,6 +54,7 @@ function ProtectedRoute() {
 export default function App() {
   return (
     <BrowserRouter>
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* ── Marketing ────────────────────────────────────────── */}
         <Route path="/" element={<LandingPage />} />
@@ -87,6 +89,7 @@ export default function App() {
         {/* ── Fallback ──────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/admin/login" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

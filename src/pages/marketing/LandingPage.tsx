@@ -8,21 +8,22 @@ import { Reveal } from '../../hooks/useReveal'
 const SERIF = "'Fraunces', Georgia, serif"
 
 const FEATURES: { titulo: string; desc: string }[] = [
-  { titulo: 'Menú con foto', desc: 'Productos con foto, descripción y precio. Organizados en categorías.' },
-  { titulo: 'Cobros con MercadoPago', desc: 'Tus clientes pagan con tarjeta o transferencia. Vos recibís el dinero directo.' },
-  { titulo: 'Pedidos por WhatsApp', desc: 'Cada pedido te llega como mensaje listo, con todos los datos del cliente.' },
-  { titulo: 'Descuentos y cupones', desc: 'Aplicá descuentos por producto o categoría. Creá cupones con códigos.' },
-  { titulo: 'Panel administrador', desc: 'Gestioná pedidos, productos y precios desde cualquier dispositivo.' },
-  { titulo: 'Estadísticas', desc: 'Tus ventas, productos más vendidos y métricas en tiempo real.' },
-  { titulo: 'Multi-rubro', desc: 'Sirve igual para gastronomía, ropa, kioscos, tecnología o lo que vendas.' },
-  { titulo: 'Tu link único', desc: 'vinto.app/tu-negocio. Compartilo en redes, perfil de WhatsApp, donde quieras.' },
-  { titulo: 'Sin login del cliente', desc: 'Tu cliente entra y pide. Sin contraseñas, sin formularios extra.' },
+  { titulo: 'Tu catálogo online en minutos', desc: 'Productos con foto, descripción y precio, organizados por categoría. Lo cargás una vez y lo editás cuando quieras.' },
+  { titulo: 'El pedido te llega listo por WhatsApp', desc: 'Con los productos, la dirección, la forma de pago y el vuelto calculado. No anotás nada a mano.' },
+  { titulo: 'Cobrá con tarjeta sin poner un posnet', desc: 'MercadoPago integrado. El dinero entra directo a tu cuenta: no pasa por Vinto.' },
+  { titulo: 'Tu cliente entra y pide. Nada más.', desc: 'Sin registro, sin contraseñas, sin descargar una app. Menos pasos, menos pedidos abandonados.' },
+  { titulo: 'Gestionás todo desde el celular', desc: 'Pedidos en vivo, cambios de precio, productos sin stock. Desde donde estés.' },
+]
+
+const EXTRAS: { titulo: string; desc: string }[] = [
+  { titulo: 'Descuentos y cupones', desc: 'Descuentos por producto o categoría, y cupones con código.' },
+  { titulo: 'Estadísticas', desc: 'Tus ventas y tus productos más vendidos, en tiempo real.' },
 ]
 
 const STEPS: { num: string; titulo: string; desc: string }[] = [
   { num: '1', titulo: 'Hablamos', desc: 'Me escribís por WhatsApp y vemos qué necesita tu negocio.' },
   { num: '2', titulo: 'Te configuramos', desc: 'Cargamos tu catálogo, tu logo, tus datos de pago.' },
-  { num: '3', titulo: 'Empezás a vender', desc: 'Compartís tu link y empezás a recibir pedidos.' },
+  { num: '3', titulo: 'Empezás a vender', desc: 'Compartís tu link (vintoapp.com/tu-negocio) en redes o en tu perfil de WhatsApp y empezás a recibir pedidos.' },
 ]
 
 const MOCK_CATEGORIAS = ['Hamburguesas', 'Bebidas', 'Pizzas']
@@ -82,7 +83,7 @@ export default function LandingPage() {
               Tu negocio, vendiendo online. Sin complicaciones.
             </h1>
             <p className="text-[#6b6258] mb-8" style={{ fontSize: '17px', lineHeight: 1.6 }}>
-              Vinto te da una tienda online lista para usar, donde tus clientes piden sin registrarse y vos gestionás todo desde un panel simple.
+              Vinto te da una tienda online lista para usar, sea gastronomía, ropa, kioscos o lo que vendas. Tus clientes piden sin registrarse y vos gestionás todo desde un panel simple.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <a
@@ -186,6 +187,13 @@ export default function LandingPage() {
                 {f.desc}
               </p>
             </Reveal>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4 mt-14 pt-8 border-t border-[#e8e1d4]">
+          {EXTRAS.map(e => (
+            <p key={e.titulo} className="text-[#6b6258]" style={{ fontSize: '13.5px', lineHeight: 1.6 }}>
+              <span className="text-[#1a1a1a]">{e.titulo}.</span> {e.desc}
+            </p>
           ))}
         </div>
       </section>
