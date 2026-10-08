@@ -37,7 +37,7 @@ function resolveImageUrl(producto: Producto): string | null {
   if (producto.imagenes && producto.imagenes.length > 0) {
     return resolveImageSrc(producto.imagenes[0].url)
   }
-  if (producto.imagenUrl) return producto.imagenUrl
+  if (producto.imagenUrl) return resolveImageSrc(producto.imagenUrl)
   return null
 }
 

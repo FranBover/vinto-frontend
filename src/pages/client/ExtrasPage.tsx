@@ -14,7 +14,7 @@ function resolveImages(producto: Producto): string[] {
       .sort((a, b) => a.orden - b.orden)
       .map(i => resolveImageUrl(i.url))
   }
-  if (producto.imagenUrl) return [producto.imagenUrl]
+  if (producto.imagenUrl) return [resolveImageUrl(producto.imagenUrl)]
   return []
 }
 

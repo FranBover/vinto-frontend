@@ -61,7 +61,7 @@ export default function MenuPage() {
 
   const { local, categorias, descuentosPedidoCompleto } = menu
   const isOpen = local.esActivo
-  const logoSrc = local.logoImagenUrl || local.logoUrl
+  const logoSrc = resolveImageUrl(local.logoImagenUrl || local.logoUrl)
 
   return (
     <div className="min-h-screen bg-[#faf8f4] text-[#1a1a1a] pb-24">
