@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useMenuStore } from '../store/menuStore'
-import { avisoLocalCerrado } from '../utils/horarios'
+import { avisoLocalAbierto, avisoLocalCerrado } from '../utils/horarios'
 
 // Tope de setTimeout (int32). proximoCambio está a 7 días como máximo, pero no cuesta nada acotarlo.
 const MAX_TIMER_MS = 2_147_483_647
@@ -54,6 +54,10 @@ export function useEstadoLocal(slug: string | undefined) {
     menu && !abierto && estadoAt !== undefined
       ? avisoLocalCerrado(menu.estado, menu.horario.zonaHoraria, estadoAt)
       : null
+  const avisoAbierto =
+    menu && abierto && estadoAt !== undefined
+      ? avisoLocalAbierto(menu.estado, menu.horario.zonaHoraria, estadoAt)
+      : 'Abierto ahora'
 
-  return { abierto, aviso }
+  return { abierto, aviso, avisoAbierto }
 }

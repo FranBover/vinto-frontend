@@ -18,7 +18,7 @@ export default function MenuPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
-  const { abierto, aviso } = useEstadoLocal(slug)
+  const { abierto, aviso, avisoAbierto } = useEstadoLocal(slug)
 
   useEffect(() => {
     if (slug) fetchMenu(slug)
@@ -214,7 +214,7 @@ export default function MenuPage() {
             className="text-[10px] font-medium uppercase"
             style={{ color: abierto ? '#2d5a27' : '#a92020', letterSpacing: '0.28em' }}
           >
-            {abierto ? 'Abierto ahora' : aviso}
+            {abierto ? avisoAbierto : aviso}
           </span>
           {!abierto && (
             <p className="mt-3 text-[13px] text-[#6b6258]" style={{ lineHeight: 1.5 }}>

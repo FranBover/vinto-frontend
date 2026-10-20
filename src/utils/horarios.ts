@@ -62,6 +62,12 @@ export function cuandoEn(iso: string, zona: string, ahora: number, accion: 'cier
 
 // ── Tienda pública ────────────────────────────────────────────────────────────
 
+/** Estado para el cliente cuando el local está abierto: "Abierto ahora · cierra 23:00". */
+export function avisoLocalAbierto(estado: EstadoLocal, zona: string, ahora: number): string {
+  const cierre = estado.proximoCambio ? cuandoEn(estado.proximoCambio, zona, ahora, 'cierra') : null
+  return cierre ? `Abierto ahora · cierra ${cierre}` : 'Abierto ahora'
+}
+
 /** Aviso para el cliente cuando el local está cerrado. */
 export function avisoLocalCerrado(estado: EstadoLocal, zona: string, ahora: number): string {
   // Cierre manual: nadie sabe cuándo se reabre. Sin próxima apertura (todo cerrado): igual.

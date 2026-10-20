@@ -85,6 +85,26 @@ export default function ExtrasPage() {
   const prodId = productoId ? parseInt(productoId, 10) : null
   const producto = menu?.categorias.flatMap(c => c.productos).find(p => p.id === prodId)
 
+  // ── Variants ──────────────────────────────────────────────────────────────
+  // Va antes de los returns tempranos: con F5 el producto llega después del primer render y los
+  // hooks tienen que ser los mismos en ambos.
+  const tieneVariantes = producto?.tieneVariantes === true
+  const variantesMenu = producto?.variantes ?? []
+  const tiposSorted = [...(producto?.tiposVariante ?? [])].sort((a, b) => a.orden - b.orden)
+  const tipo1 = tiposSorted[0]
+
+  const varianteActiva = tieneVariantes
+    ? resolveVarianteActiva(tiposSorted, variantesMenu, selectedOpciones)
+    : null
+
+  const maxCantidad = varianteActiva?.stock != null ? varianteActiva.stock : null
+
+  useEffect(() => {
+    if (maxCantidad != null && cantidad > maxCantidad) {
+      setCantidad(Math.max(1, maxCantidad))
+    }
+  }, [varianteActiva?.id])
+
   if (loading && !producto) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#faf8f4]">
@@ -114,25 +134,6 @@ export default function ExtrasPage() {
   const images = resolveImages(producto)
   const activeIndex = Math.min(imgIndex, Math.max(0, images.length - 1))
   const canNavigate = images.length > 1
-
-  // ── Variants ──────────────────────────────────────────────────────────────
-  const tieneVariantes = producto.tieneVariantes === true
-  const tiposVariante = producto.tiposVariante ?? []
-  const variantesMenu = producto.variantes ?? []
-  const tiposSorted = [...tiposVariante].sort((a, b) => a.orden - b.orden)
-  const tipo1 = tiposSorted[0]
-
-  const varianteActiva = tieneVariantes
-    ? resolveVarianteActiva(tiposSorted, variantesMenu, selectedOpciones)
-    : null
-
-  const maxCantidad = varianteActiva?.stock != null ? varianteActiva.stock : null
-
-  useEffect(() => {
-    if (maxCantidad != null && cantidad > maxCantidad) {
-      setCantidad(Math.max(1, maxCantidad))
-    }
-  }, [varianteActiva?.id])
 
   function handleSelectOpcion(tipoId: number, opcionId: number, tipoIndex: number) {
     setSelectedOpciones(prev => {
