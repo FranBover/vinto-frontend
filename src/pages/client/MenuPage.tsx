@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
 import { useCartStore } from '../../store/cartStore'
+import { useEstadoLocal } from '../../hooks/useEstadoLocal'
+import { resumirHorarios } from '../../utils/horarios'
 import { resolveImageUrl, WHATSAPP_URL } from '../../config'
 import CartBar from '../../components/client/CartBar'
 import BannerDescuentos from '../../components/client/BannerDescuentos'
@@ -16,6 +18,7 @@ export default function MenuPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
+  const { abierto, aviso } = useEstadoLocal(slug)
 
   useEffect(() => {
     if (slug) fetchMenu(slug)
@@ -60,7 +63,7 @@ export default function MenuPage() {
   }
 
   const { local, categorias, descuentosPedidoCompleto } = menu
-  const isOpen = local.esActivo
+  const gruposHorario = resumirHorarios(menu.horario.dias)
   const logoSrc = resolveImageUrl(local.logoImagenUrl || local.logoUrl)
 
   return (
@@ -206,13 +209,18 @@ export default function MenuPage() {
         </div>
 
         {/* ── Status (sin banner, como eyebrow editorial) ───── */}
-        <div className="text-center pb-8 pt-5 px-6">
+        <div role="status" className="text-center pb-8 pt-5 px-6">
           <span
             className="text-[10px] font-medium uppercase"
-            style={{ color: isOpen ? '#2d5a27' : '#a92020', letterSpacing: '0.28em' }}
+            style={{ color: abierto ? '#2d5a27' : '#a92020', letterSpacing: '0.28em' }}
           >
-            {isOpen ? 'Abierto ahora' : 'Cerrado por ahora'}
+            {abierto ? 'Abierto ahora' : aviso}
           </span>
+          {!abierto && (
+            <p className="mt-3 text-[13px] text-[#6b6258]" style={{ lineHeight: 1.5 }}>
+              Podés ver el menú, pero por ahora no se pueden hacer pedidos.
+            </p>
+          )}
         </div>
 
         {/* ── Discount banner (componente intacto) ──────────── */}
@@ -224,19 +232,13 @@ export default function MenuPage() {
         <div>
           {categorias.map((cat) => {
             const count = cat.productos.length
-            const disabled = !isOpen
             const imgSrc = cat.imagenUrl ? resolveImageUrl(cat.imagenUrl) : null
 
             return (
               <button
                 key={cat.id}
-                disabled={disabled}
                 onClick={() => navigate(`/${slug}/productos/${cat.id}`)}
-                className={`block w-full text-left border-t border-[#e8e1d4] ${
-                  disabled
-                    ? 'opacity-40 cursor-not-allowed'
-                    : 'hover:bg-[#ede5d3]/20 active:bg-[#ede5d3]/40 transition-colors'
-                }`}
+                className="block w-full text-left border-t border-[#e8e1d4] hover:bg-[#ede5d3]/20 active:bg-[#ede5d3]/40 transition-colors"
               >
                 <div
                   className="w-full flex items-center justify-center overflow-hidden"
@@ -360,12 +362,19 @@ export default function MenuPage() {
                   </a>
                 </div>
               )}
-              {local.horarios && (
+              {gruposHorario.length > 0 && (
                 <div>
                   <p className="text-[10px] font-medium uppercase text-[#6b6258] mb-2" style={{ letterSpacing: '0.2em' }}>
                     Horarios
                   </p>
-                  <p className="text-sm text-[#1a1a1a] whitespace-pre-line">{local.horarios}</p>
+                  <ul className="space-y-1">
+                    {gruposHorario.map(g => (
+                      <li key={g.dias ?? g.horas} className="text-sm text-[#1a1a1a]">
+                        {g.dias && <span className="font-medium">{g.dias}: </span>}
+                        {g.horas}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>

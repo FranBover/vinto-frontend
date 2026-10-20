@@ -88,7 +88,13 @@ const NAV_ITEMS = [
   },
 ]
 
-export default function Sidebar() {
+interface Props {
+  /** Solo aplica por debajo de md: en desktop la sidebar siempre está a la vista. */
+  abierto: boolean
+  onCerrar: () => void
+}
+
+export default function Sidebar({ abierto, onCerrar }: Props) {
   const logout = useAuthStore(s => s.logout)
   const navigate = useNavigate()
   const [alertaCount, setAlertaCount] = useState(0)
@@ -107,7 +113,9 @@ export default function Sidebar() {
   return (
     <aside
       style={{ width: 200, minWidth: 200, backgroundColor: '#1a1a1a' }}
-      className="fixed top-0 left-0 h-screen flex flex-col z-40"
+      className={`fixed top-0 left-0 h-screen flex flex-col z-40 transition-transform duration-200 md:translate-x-0 ${
+        abierto ? 'translate-x-0' : '-translate-x-full'
+      }`}
     >
       {/* Logo */}
       <div className="px-5 pt-6 pb-5 border-b border-white/10">
@@ -126,6 +134,7 @@ export default function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={onCerrar}
             style={({ isActive }) =>
               isActive
                 ? {

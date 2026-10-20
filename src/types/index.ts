@@ -21,8 +21,6 @@ export interface Administrador {
   telefono: string
   linkWhatsapp: string
   logoUrl: string
-  esActivo: boolean
-  esAbierto: boolean
   aliasTransferencia: string | null
   titularCuenta: string | null
   horarios: string | null
@@ -261,6 +259,41 @@ export interface StockAlertaDTO {
   tipo: 'agotado' | 'bajo'
 }
 
+// ── Horarios y cierre manual ──────────────────────────────────────────────────
+
+export type ModoHorario = 'Cerrado' | '24h' | 'Turnos'
+
+/**
+ * `diaSemana` sigue System.DayOfWeek (0 = domingo ... 6 = sábado). Las horas son "HH:mm";
+ * si el cierre es menor que la apertura, el turno termina al día siguiente. Los turnos
+ * solo se cargan con modo 'Turnos'.
+ */
+export interface HorarioDia {
+  diaSemana: number
+  modo: ModoHorario
+  turno1Apertura: string | null
+  turno1Cierre: string | null
+  turno2Apertura: string | null
+  turno2Cierre: string | null
+}
+
+export type MotivoEstadoLocal = 'SinHorarios' | 'Horario' | 'CerradoManualmente'
+
+export interface EstadoLocal {
+  estaAbierto: boolean
+  motivo: MotivoEstadoLocal
+  /** Instante UTC (ISO). Próximo cierre si está abierto, próxima apertura si está cerrado; null si no hay. */
+  proximoCambio: string | null
+}
+
+export interface HorariosLocal {
+  zonaHoraria: string
+  cerradoManualmente: boolean
+  /** 0 elementos = sin horarios fijos (siempre abierto) o exactamente 7. */
+  dias: HorarioDia[]
+  estado: EstadoLocal
+}
+
 // ── Menu público ──────────────────────────────────────────────────────────────
 
 export interface LocalPublico {
@@ -271,14 +304,19 @@ export interface LocalPublico {
   logoUrl: string | null
   logoImagenUrl: string | null
   direccion: string
-  esActivo: boolean
   aliasTransferencia: string | null
   titularCuenta: string | null
-  horarios: string | null
   ubicacionUrl: string | null
   zonaEnvio: 'Ciudad' | 'Nacional'
   costoEnvio: number | null
   mercadoPagoHabilitado: boolean
+}
+
+/** Horarios del local tal como los publica el menú: mismo formato que el panel, sin el estado de cierre. */
+export interface HorarioPublico {
+  zonaHoraria: string
+  /** 0 elementos = sin horarios fijos (siempre abierto) o exactamente 7. */
+  dias: HorarioDia[]
 }
 
 export interface CategoriaPublica {
@@ -293,6 +331,9 @@ export interface MenuPublico {
   local: LocalPublico
   categorias: CategoriaPublica[]
   descuentosPedidoCompleto?: DescuentoPedidoCompleto[]
+  /** Se calcula en cada request: es lo único del menú que cambia con la hora. */
+  estado: EstadoLocal
+  horario: HorarioPublico
 }
 
 // ── MercadoPago ──────────────────────────────────────────────────────────────

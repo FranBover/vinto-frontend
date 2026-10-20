@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import Sidebar from './Sidebar'
 import NuevoPedidoToast from '../NuevoPedidoToast'
 import PagoConfirmadoToast from './PagoConfirmadoToast'
@@ -26,6 +26,8 @@ export default function AdminLayout({ title, subtitle, actions, children }: Prop
   const emitirReconexion = useNotificationsStore(s => s.emitirReconexion)
   const toasts =useNotificationsStore(s => s.toasts)
   const cerrarToast = useNotificationsStore(s => s.cerrarToast)
+  const [menuAbierto, setMenuAbierto] = useState(false)
+  const cerrarMenu = useCallback(() => setMenuAbierto(false), [])
 
   const handleNuevoPedido = useCallback(
     (pedido: NuevoPedidoPayload) => emitirNuevoPedido(pedido),
@@ -45,22 +47,41 @@ export default function AdminLayout({ title, subtitle, actions, children }: Prop
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: '#fafaf9' }}>
-      <Sidebar />
+      <Sidebar abierto={menuAbierto} onCerrar={cerrarMenu} />
 
-      {/* Main content — offset by sidebar width */}
-      <div className="flex-1 flex flex-col" style={{ marginLeft: 200 }}>
+      {/* Por debajo de md la sidebar es un drawer: este fondo lo cierra al tocar afuera */}
+      {menuAbierto && (
+        <div className="fixed inset-0 z-[35] bg-black/40 md:hidden" onClick={cerrarMenu} aria-hidden="true" />
+      )}
+
+      {/* Main content — offset by sidebar width (desde md; antes la sidebar es un drawer) */}
+      <div className="flex-1 max-md:min-w-0 flex flex-col md:ml-[200px]">
         {/* Header */}
         <header
-          className="sticky top-0 z-30 flex items-center justify-between px-8 border-b border-[#e8e8e8]"
+          className="sticky top-0 z-30 flex items-center justify-between gap-3 px-4 md:px-8 border-b border-[#e8e8e8]"
           style={{ backgroundColor: '#fafaf9', height: 64 }}
         >
-          <div>
-            <h1 className="text-[17px] font-bold text-[#1a1a1a] leading-tight">{title}</h1>
-            {subtitle && (
-              <p className="text-xs text-[#aaa] mt-0.5">{subtitle}</p>
-            )}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => setMenuAbierto(true)}
+              aria-label="Abrir menú"
+              aria-expanded={menuAbierto}
+              className="md:hidden flex-shrink-0 flex items-center justify-center text-[#1a1a1a]"
+              style={{ width: 44, height: 44, marginLeft: -10 }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M4 6h16M4 12h16M4 18h16"/>
+              </svg>
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-[17px] font-bold text-[#1a1a1a] leading-tight truncate">{title}</h1>
+              {subtitle && (
+                <p className="text-xs text-[#aaa] mt-0.5 truncate">{subtitle}</p>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-3 md:gap-5 flex-shrink-0">
             <ConexionChip state={connectionState} />
             {actions && <div className="flex items-center gap-3">{actions}</div>}
           </div>
@@ -70,7 +91,7 @@ export default function AdminLayout({ title, subtitle, actions, children }: Prop
         <MercadoPagoStatusBanner />
 
         {/* Page content */}
-        <main className="flex-1 px-8 py-6">
+        <main className="flex-1 px-4 md:px-8 py-6">
           {children}
         </main>
       </div>

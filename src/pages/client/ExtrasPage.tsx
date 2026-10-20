@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
 import { useCartStore } from '../../store/cartStore'
+import { useEstadoLocal } from '../../hooks/useEstadoLocal'
 import type { Producto, ProductoExtra, TipoVarianteMenu, VarianteMenu } from '../../types'
 import { resolveImageUrl } from '../../config'
 
@@ -68,6 +69,7 @@ export default function ExtrasPage() {
   const navigate = useNavigate()
   const { data, loading, fetchMenu } = useMenuStore()
   const agregarItem = useCartStore(s => s.agregarItem)
+  const { abierto, aviso } = useEstadoLocal(slug)
 
   const [selectedExtras, setSelectedExtras] = useState<ProductoExtra[]>([])
   const [cantidad, setCantidad] = useState(1)
@@ -82,7 +84,6 @@ export default function ExtrasPage() {
   const menu = slug ? data[slug] : null
   const prodId = productoId ? parseInt(productoId, 10) : null
   const producto = menu?.categorias.flatMap(c => c.productos).find(p => p.id === prodId)
-  const isOpen = menu?.local.esActivo ?? true
 
   if (loading && !producto) {
     return (
@@ -163,7 +164,7 @@ export default function ExtrasPage() {
   const precioUnitario = basePrecio + extrasTotal
   const totalItem = precioUnitario * cantidad
 
-  const canAdd = isOpen && (!tieneVariantes || (varianteActiva !== null && isVarianteAvailable(varianteActiva)))
+  const canAdd = abierto && (!tieneVariantes || (varianteActiva !== null && isVarianteAvailable(varianteActiva)))
 
   const handleAgregar = () => {
     if (!canAdd) return
@@ -465,8 +466,8 @@ export default function ExtrasPage() {
           </div>
         ) : (
           <span className="text-[13px] text-[#6b6258]" style={{ fontStyle: 'italic' }}>
-            {!isOpen
-              ? 'Local cerrado'
+            {!abierto
+              ? (aviso ?? 'Local cerrado')
               : tieneVariantes && varianteActiva && !isVarianteAvailable(varianteActiva)
                 ? 'Agotado'
                 : tieneVariantes && !varianteActiva

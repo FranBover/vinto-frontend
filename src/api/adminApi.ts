@@ -18,6 +18,9 @@ import type {
   MercadoPagoDiagnosticoResponse,
   Periodo,
   DashboardReporte,
+  HorarioDia,
+  HorariosLocal,
+  EstadoLocal,
 } from '../types'
 
 export type { ImagenResponse }
@@ -158,16 +161,35 @@ export const updateLocalData = async (id: number, payload: {
   direccion: string
   linkWhatsapp: string
   logoUrl: string
-  esActivo: boolean
   aliasTransferencia: string
   titularCuenta: string
-  horarios: string
   ubicacionUrl: string
   zonaEnvio?: string
   costoEnvio?: number | null
   slugLocal?: string
 }) => {
   const { data } = await apiClient.patch(`/Administrador/${id}/local`, payload)
+  return data
+}
+
+// ── Horarios y cierre manual ──────────────────────────────────────────────────
+// El local sale del JWT: ninguna de estas rutas lleva el id del administrador.
+
+export const getHorariosLocal = async (): Promise<HorariosLocal> => {
+  const { data } = await apiClient.get<HorariosLocal>('/Administrador/local/horarios')
+  return data
+}
+
+export const updateHorariosLocal = async (payload: {
+  zonaHoraria: string
+  dias: HorarioDia[]
+}): Promise<HorariosLocal> => {
+  const { data } = await apiClient.put<HorariosLocal>('/Administrador/local/horarios', payload)
+  return data
+}
+
+export const setCierreManual = async (cerrado: boolean): Promise<EstadoLocal> => {
+  const { data } = await apiClient.patch<EstadoLocal>('/Administrador/local/cierre-manual', { cerrado })
   return data
 }
 

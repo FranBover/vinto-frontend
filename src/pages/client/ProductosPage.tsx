@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMenuStore } from '../../store/menuStore'
+import { useEstadoLocal } from '../../hooks/useEstadoLocal'
 import CartBar from '../../components/client/CartBar'
 import { resolveImageUrl as resolveImageSrc } from '../../config'
 import type { Producto } from '../../types'
@@ -45,6 +46,7 @@ export default function ProductosPage() {
   const { slug, categoriaId } = useParams<{ slug: string; categoriaId: string }>()
   const navigate = useNavigate()
   const { data, loading, fetchMenu } = useMenuStore()
+  const { abierto, aviso } = useEstadoLocal(slug)
 
   useEffect(() => {
     if (slug) fetchMenu(slug)
@@ -54,7 +56,6 @@ export default function ProductosPage() {
   const catId = categoriaId ? parseInt(categoriaId, 10) : null
   const categoria = menu?.categorias.find(c => c.id === catId)
   const productos = categoria?.productos.filter(p => p.disponible) ?? []
-  const isOpen = menu?.local.esActivo ?? true
   const [imgErrors, setImgErrors] = useState<Set<number>>(new Set())
 
   if (loading && !menu) {
@@ -108,13 +109,13 @@ export default function ProductosPage() {
       <div className="mx-auto" style={{ maxWidth: '560px' }}>
 
         {/* ── Closed banner (eyebrow editorial) ────────────────── */}
-        {!isOpen && (
-          <div className="text-center py-7 px-6">
+        {!abierto && (
+          <div role="status" className="text-center py-7 px-6">
             <span
               className="text-[10px] font-medium uppercase"
               style={{ color: '#a92020', letterSpacing: '0.28em' }}
             >
-              El local está cerrado
+              {aviso}
             </span>
           </div>
         )}
@@ -210,7 +211,7 @@ export default function ProductosPage() {
                         onClick={() =>
                           navigate(`/${slug}/productos/${categoriaId}/${producto.id}`)
                         }
-                        disabled={!isOpen || isAgotado}
+                        disabled={!abierto || isAgotado}
                         aria-label={`Agregar ${producto.nombre}`}
                         className="w-9 h-9 bg-[#1a1a1a] text-[#faf8f4] flex items-center justify-center font-light text-xl rounded-none disabled:opacity-30 disabled:cursor-not-allowed"
                       >

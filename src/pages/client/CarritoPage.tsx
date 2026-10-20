@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../../store/cartStore'
-import { useMenuStore } from '../../store/menuStore'
+import { useEstadoLocal } from '../../hooks/useEstadoLocal'
 import { resolveImageUrl as resolveImageSrc } from '../../config'
 import type { Producto } from '../../types'
 
@@ -22,7 +22,7 @@ export default function CarritoPage() {
   const quitarItem = useCartStore(s => s.quitarItem)
   const cambiarCantidad = useCartStore(s => s.cambiarCantidad)
   const total = useCartStore(s => s.total())
-  const isOpen = useMenuStore(s => (slug ? s.data[slug]?.local.esActivo : undefined)) ?? true
+  const { abierto, aviso } = useEstadoLocal(slug)
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set())
 
   // Subtotal sin descuentos (precio original × cantidad, + extras) y ahorro total.
@@ -225,9 +225,9 @@ export default function CarritoPage() {
 
       {/* ── CTA fixed ──────────────────────────────────────────── */}
       <footer className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#e8e1d4]">
-        {!isOpen && (
-          <p className="text-center text-[10px] font-medium uppercase pt-2.5" style={{ color: '#a92020', letterSpacing: '0.2em' }}>
-            El local está cerrado temporalmente
+        {!abierto && (
+          <p role="status" className="text-center text-[10px] font-medium uppercase pt-2.5 px-5" style={{ color: '#a92020', letterSpacing: '0.2em' }}>
+            {aviso}
           </p>
         )}
         <div className="mx-auto flex items-center justify-between gap-4 px-5 py-3" style={{ maxWidth: '560px' }}>
@@ -241,7 +241,7 @@ export default function CarritoPage() {
           </div>
           <button
             onClick={() => navigate(`/${slug}/checkout`)}
-            disabled={!isOpen}
+            disabled={!abierto}
             className="px-6 py-3 text-[12px] font-medium uppercase rounded-none text-[#faf8f4] bg-[#73223a] hover:bg-[#651d33] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
             style={{ letterSpacing: '0.15em' }}
           >

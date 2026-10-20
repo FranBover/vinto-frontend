@@ -7,6 +7,7 @@ import type { Administrador } from '../../types'
 import ImageUploader from '../../components/admin/ImageUploader'
 import SeccionMercadoPago from '../../components/admin/SeccionMercadoPago'
 import SeccionUrlPublica from '../../components/admin/SeccionUrlPublica'
+import SeccionHorarios from '../../components/admin/horarios/SeccionHorarios'
 
 const inputCls =
   'w-full border border-[#d0d0d0] px-3 py-2.5 text-sm rounded-none outline-none focus:border-[#1a1a1a] bg-white transition-colors'
@@ -22,7 +23,6 @@ export default function MiLocalPage() {
   const [error, setError] = useState<string | null>(null)
 
   // Form fields
-  const [esActivo, setEsActivo] = useState(false)
   const [nombreLocal, setNombreLocal] = useState('')
   const [telefono, setTelefono] = useState('')
   const [direccion, setDireccion] = useState('')
@@ -30,7 +30,6 @@ export default function MiLocalPage() {
   const [logoUrl, setLogoUrl] = useState('')
   const [aliasTransferencia, setAliasTransferencia] = useState('')
   const [titularCuenta, setTitularCuenta] = useState('')
-  const [horarios, setHorarios] = useState('')
   const [ubicacionUrl, setUbicacionUrl] = useState('')
   const [zonaEnvio, setZonaEnvio] = useState<'Ciudad' | 'Nacional'>('Nacional')
   const [costoEnvio, setCostoEnvio] = useState('')
@@ -44,7 +43,6 @@ export default function MiLocalPage() {
     ])
       .then(([a, imgs]: [Administrador, ImagenResponse[]]) => {
         setAdmin(a)
-        setEsActivo(a.esAbierto)
         setNombreLocal(a.nombreLocal)
         setTelefono(a.telefono)
         setDireccion(a.direccion)
@@ -52,7 +50,6 @@ export default function MiLocalPage() {
         setLogoUrl(a.logoUrl ?? '')
         setAliasTransferencia(a.aliasTransferencia ?? '')
         setTitularCuenta(a.titularCuenta ?? '')
-        setHorarios(a.horarios ?? '')
         setUbicacionUrl(a.ubicacionUrl ?? '')
         setZonaEnvio(a.zonaEnvio ?? 'Nacional')
         setCostoEnvio(a.costoEnvio != null ? String(a.costoEnvio) : '')
@@ -70,7 +67,6 @@ export default function MiLocalPage() {
     setSavedMsg(false)
     try {
       await updateLocalData(adminId, {
-        esActivo,
         nombreLocal: nombreLocal.trim(),
         telefono: telefono.trim(),
         direccion: direccion.trim(),
@@ -78,7 +74,6 @@ export default function MiLocalPage() {
         logoUrl: logoUrl.trim(),
         aliasTransferencia: aliasTransferencia.trim(),
         titularCuenta: titularCuenta.trim(),
-        horarios: horarios.trim(),
         ubicacionUrl: ubicacionUrl.trim(),
         zonaEnvio,
         costoEnvio: costoEnvio !== '' ? parseFloat(costoEnvio) : null,
@@ -118,43 +113,11 @@ export default function MiLocalPage() {
             onSlugGuardado={slugLocal => setAdmin(prev => (prev ? { ...prev, slugLocal } : prev))}
           />
         )}
-        <form id="mi-local-form" onSubmit={handleSave} className="space-y-6">
 
-          {/* Abierto/Cerrado toggle */}
-          <div className="border border-[#e8e8e8] bg-white px-6 py-5 flex items-center justify-between">
-            <div>
-              <p className="font-bold text-[15px]">{esActivo ? 'Local abierto' : 'Local cerrado'}</p>
-              <p className="text-sm text-[#aaa] mt-0.5">
-                {esActivo
-                  ? 'Los clientes pueden hacer pedidos ahora.'
-                  : 'El local no acepta pedidos en este momento.'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setEsActivo(v => !v)}
-              className="relative flex-shrink-0 ml-6"
-              style={{ width: 52, height: 28 }}
-              aria-pressed={esActivo}
-            >
-              <span
-                className="block w-full h-full transition-colors"
-                style={{
-                  backgroundColor: esActivo ? '#2d5a27' : '#d0d0d0',
-                  borderRadius: 0,
-                }}
-              />
-              <span
-                className="absolute top-1 transition-all bg-white"
-                style={{
-                  width: 20,
-                  height: 20,
-                  left: esActivo ? 28 : 4,
-                  borderRadius: 0,
-                }}
-              />
-            </button>
-          </div>
+        {/* Estado y horarios: se guardan aparte (otros endpoints), no con "Guardar cambios" */}
+        <SeccionHorarios />
+
+        <form id="mi-local-form" onSubmit={handleSave} className="space-y-6">
 
           {error && (
             <p className="text-sm text-red-600">{error}</p>
@@ -261,16 +224,6 @@ export default function MiLocalPage() {
                 value={titularCuenta}
                 onChange={e => setTitularCuenta(e.target.value)}
                 placeholder="Juan Pérez"
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Horarios</label>
-              <textarea
-                className={`${inputCls} resize-none`}
-                rows={2}
-                value={horarios}
-                onChange={e => setHorarios(e.target.value)}
-                placeholder="Ej: Mar a Dom de 19:30 a 01:00"
               />
             </div>
             <div>

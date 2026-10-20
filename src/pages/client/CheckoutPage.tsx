@@ -1,7 +1,9 @@
-import { lazy, Suspense, useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../../store/cartStore'
 import { useMenuStore } from '../../store/menuStore'
+import { useEstadoLocal } from '../../hooks/useEstadoLocal'
+import { leerLocalCerrado } from '../../utils/horarios'
 import { crearPedido } from '../../api/publicApi'
 import { crearPreferenciaMP } from '../../api/mercadoPagoApi'
 import type { FormaPago, FormaEntrega, CrearPedidoDto } from '../../types'
@@ -29,6 +31,8 @@ export default function CheckoutPage() {
   const navigate = useNavigate()
   const items = useCartStore(s => s.items)
   const menu = useMenuStore(s => (slug ? s.data[slug] : null))
+  const refrescarEstado = useMenuStore(s => s.refrescarEstado)
+  const { abierto, aviso } = useEstadoLocal(slug)
   const [cuponAplicado, setCuponAplicado] = useState<CuponAplicado | null>(null)
 
   const [nombre, setNombre] = useState('')
@@ -51,6 +55,12 @@ export default function CheckoutPage() {
   const [montoPago, setMontoPago] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const errorRef = useRef<HTMLDivElement>(null)
+
+  // El error queda al final del formulario, bajo el scroll: se lo trae a la vista (el CTA fijo no lo tapa).
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [error])
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -83,7 +93,7 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!menu) return
+    if (!menu || !abierto) return
 
     if (formaPago === 'Efectivo' && !montoPago) {
       setError('Ingresá con cuánto vas a pagar')
@@ -185,8 +195,15 @@ export default function CheckoutPage() {
           montoPagoEfectivo: formaPago === 'Efectivo' && montoPago ? parseFloat(montoPago) : undefined,
         },
       })
-    } catch {
-      setError('No se pudo enviar el pedido. Revisá tu conexión e intentá de nuevo.')
+    } catch (err) {
+      const cerrado = leerLocalCerrado(err)
+      if (cerrado) {
+        // El carrito y los datos cargados quedan como están; solo se actualiza el estado en pantalla.
+        setError(cerrado.mensaje)
+        void refrescarEstado(slug!)
+      } else {
+        setError('No se pudo enviar el pedido. Revisá tu conexión e intentá de nuevo.')
+      }
       setLoading(false)
     }
   }
@@ -609,13 +626,18 @@ export default function CheckoutPage() {
         </div>
 
         {error && (
-          <div className="mt-8 p-3 border" style={{ backgroundColor: '#fef2f2', borderColor: '#a92020' }}>
+          <div ref={errorRef} role="alert" className="mt-8 p-3 border" style={{ backgroundColor: '#fef2f2', borderColor: '#a92020' }}>
             <p className="text-sm" style={{ color: '#a92020' }}>{error}</p>
           </div>
         )}
 
         {/* ── CTA fixed — submit dentro del form ─────────────────── */}
         <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#e8e1d4]">
+          {!abierto && (
+            <p role="status" className="text-center text-[10px] font-medium uppercase pt-2.5 px-5" style={{ color: '#a92020', letterSpacing: '0.2em' }}>
+              {aviso}
+            </p>
+          )}
           <div className="mx-auto flex items-center justify-between gap-4 px-5 py-3" style={{ maxWidth: '560px' }}>
             <div className="flex flex-col leading-none">
               <span className="text-[10px] font-medium text-[#6b6258] uppercase mb-1" style={{ letterSpacing: '0.2em' }}>
@@ -627,7 +649,7 @@ export default function CheckoutPage() {
             </div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !abierto}
               className="px-6 py-3 text-[12px] font-medium uppercase rounded-none text-[#faf8f4] bg-[#73223a] hover:bg-[#651d33] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               style={{ letterSpacing: '0.15em' }}
             >
