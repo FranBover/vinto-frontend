@@ -3,7 +3,7 @@
 Documento de referencia largo. Para las reglas cortas de trabajo ver
 [`../CLAUDE.md`](../CLAUDE.md).
 
-Estado verificado contra el código al 2026-10-07 (branch `main`, commit `dd77ce7`).
+Estado verificado contra el código al 2026-10-21 (branch `main`, commit `0a4a8be`).
 
 ---
 
@@ -42,6 +42,7 @@ src/
 ├── components/
 │   ├── admin/          layout, sidebar, modales, uploader, secciones
 │   │   │               (ConexionIndicador, SeccionUrlPublica, ...)
+│   │   ├── horarios/   estado del local + cierre manual + editor (§8.6)
 │   │   └── reportes/   gráficos Recharts + paleta
 │   ├── client/         CartBar, CuponInput, BannerDescuentos
 │   ├── DireccionAutocomplete.tsx   Leaflet + Nominatim; SOLO vía lazy (§5.1)
@@ -49,6 +50,8 @@ src/
 │   └── NuevoPedidoToast.tsx
 ├── hooks/
 │   ├── usePedidosHub.ts  conexión SignalR
+│   ├── useAlertaSesionExpirada.ts  pitido + título de pestaña al vencer la sesión (§7)
+│   ├── useEstadoLocal.ts abierto/cerrado de la tienda, se refresca solo (§8.6)
 │   └── useReveal.tsx     animación de entrada (solo landing)
 ├── pages/
 │   ├── client/     flujo público de compra
@@ -56,13 +59,18 @@ src/
 │   └── marketing/  LandingPage
 ├── store/          Zustand: auth, cart, menu, notifications
 ├── types/index.ts  modelos y DTOs del dominio (los de admin, en adminApi.ts)
+├── utils/horarios.ts  formateo de horarios y estado, compartido panel/tienda (§8.6)
+├── utils/sesion.ts    "a las 22:03" / "mañana a las 11:00" del vencimiento de la sesión (§7)
 ├── config.ts       URLs de entorno + resolveImageUrl + constantes de marketing
 ├── index.css       @import "tailwindcss" + una animación
 └── main.tsx        createRoot + StrictMode
 public/             og-image.png, íconos, staticwebapp.config.json
 ```
 
-No existen `components/ui/` ni `utils/`.
+`utils/` contiene dos archivos: `horarios.ts` (siempre en la zona del local) y
+`sesion.ts` (en la zona del dispositivo, a propósito: es el reloj de quien usa el
+panel, no un horario de atención). No existe `components/ui/` (en el disco hay un
+directorio vacío con ese nombre; git no lo versiona).
 
 ---
 
@@ -95,25 +103,57 @@ también abre en pestaña nueva; ver §8.4).
 | Archivo | Versionado | Contenido |
 |---|---|---|
 | `.env` | No (`.gitignore`) | `VITE_API_URL`, `VITE_BASE_URL` locales |
-| `.env.development` | **No, y tampoco ignorado** (aparece como `??` en `git status`) | idem, para `npm run dev` |
-| `.env.production` | Sí | `VITE_API_URL`, `VITE_BASE_URL` de producción |
-| `.env.example` | Sí | plantilla — **hoy incompleta, ver §11** |
+| `.env.development` | No (`.gitignore`, desde `22fbbf0`) | las mismas dos, **apuntando a localhost** (`:5202`), para `npm run dev` |
+| `.env.production` | **Sí, el único `.env` real versionado** | `VITE_API_URL`, `VITE_BASE_URL` de producción |
+| `.env.example` | Sí (plantilla) | **hoy incompleta y en UTF-16, ver §11** |
 
 Vite solo expone al bundle las variables con prefijo `VITE_`. Todo lo que se
 ponga ahí termina en el JavaScript público: **nunca meter secretos en un
-`.env` de este repo.**
+`.env` de este repo.** Este documento tampoco lista los hosts reales.
+
+### Trampa de entornos
+
+Vite carga `.env`, luego `.env.[modo]` (y los `*.local`, también ignorados); el
+más específico pisa al anterior. Verificado con `loadEnv` de Vite:
+
+| Comando | Modo | Archivos que aplican | Apunta a |
+|---|---|---|---|
+| `npm run dev` | `development` | `.env` → `.env.development` | localhost (si `.env.development` existe) |
+| `npm run dev -- --mode production` | `production` | `.env` → `.env.production` | **producción** |
+| `npm run build` | `production` | `.env` → `.env.production` | producción: las URLs quedan fijas en `dist/` (el build de CI hace lo mismo) |
+
+`npm run preview` no relee ningún `.env`: sirve el `dist/` ya construido, así que
+apunta a lo que haya apuntado el último `build` (normalmente producción).
+
+- **`.env.development` tiene que apuntar a localhost.** Es la única barrera entre
+  `npm run dev` y la API real. Como no se versiona, nada en el repo la sostiene:
+  si el archivo se borra o se edita, el dev server cae al `.env` sin avisar. En
+  la máquina de desarrollo donde se verificó este documento, `.env` es idéntico
+  a `.env.production` (o sea, **sin** `.env.development` el dev pegaría a
+  producción). Con las dos variables sin definir, `config.ts` cae a
+  `http://localhost:5202`.
+- **Para probar contra producción, usá `npm run dev -- --mode production`**, no
+  edites `.env.development`.
+- El CI de Azure Static Web Apps construye en la nube con `.env.production`
+  versionado, así que ese archivo define las URLs del bundle publicado (§10).
 
 ### `resolveImageUrl`
 
 ```ts
-export const resolveImageUrl = (url) =>
-  !url ? '' : (url.startsWith('http') ? url : `${BASE_URL}${url}`)
+const ABSOLUTE_URL = /^https?:\/\//i
+
+export const resolveImageUrl = (url) => {
+  if (!url) return ''
+  if (ABSOLUTE_URL.test(url)) return url
+  return `${BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`
+}
 ```
 
 El backend devuelve rutas relativas (`/uploads/...`) para las imágenes que él
-mismo almacena, pero algunos campos legacy (`producto.imagenUrl` cargado a mano
-en el panel) pueden traer una URL absoluta. La función maneja los dos casos.
-Todo `<img src>` que muestre datos del backend tiene que pasar por acá.
+mismo almacena, pero hay URLs absolutas (Blob Storage, y los campos legacy como
+`producto.imagenUrl` cargado a mano en el panel). La función maneja los dos
+casos, con o sin `/` inicial. Todo `<img src>` que muestre datos del backend
+tiene que pasar por acá.
 
 ---
 
@@ -144,18 +184,24 @@ separado, un bloqueo por rate limit ya no se lee como contraseña mala.
 ### Endpoints por módulo
 
 **`publicApi.ts`** (sin auth)
-- `GET  /public/locales/{slug}/menu`
-- `POST /public/locales/{slug}/pedidos`
+- `GET  /public/locales/{slug}/menu` — además del catálogo trae `estado` y
+  `horario` (§8.6)
+- `POST /public/locales/{slug}/pedidos` — con el local cerrado responde
+  **409** `{ mensaje, codigo: 'LocalCerrado', proximoCambio }` (§8.6)
 - `POST /public/locales/{slug}/cupones/validar`
 
 **`mercadoPagoApi.ts`** (sin auth)
 - `POST /public/locales/{slug}/pedidos/{pedidoId}/preferencia-mp`
 - `GET  /public/pedidos/{codigoSeguimiento}/estado-pago`
 
-**`adminApi.ts`** (JWT) — auth, pedidos (**paginados**: `getPedidos(adminId,
+**`adminApi.ts`** (JWT) — auth, ticket del hub (`pedirTicketHub`: `POST
+/Hub/ticket` → `{ ticket, expiraEnSegundos }`, §7), pedidos (**paginados**: `getPedidos(adminId,
 filtros, page, pageSize)` → `{ items, total, page, pageSize, totalPages }`) +
 comanda/ticket + comentarios, datos del local (`updateLocalData`, incluye
-`slugLocal`),
+`slugLocal`; **ya no manda `esActivo` ni `horarios`**), horarios y cierre manual
+(`getHorariosLocal`, `updateHorariosLocal`, `setCierreManual`: `GET`/`PUT
+/Administrador/local/horarios` y `PATCH /Administrador/local/cierre-manual`, sin
+id del admin en la ruta — el local sale del JWT; §8.6),
 productos, categorías (con reordenamiento), extras, variantes (tipos, opciones,
 generación combinatoria), stock (alertas, ajuste, alta), descuentos, cupones
 (+ métricas), imágenes (upload/list/delete), reportes, y conexión OAuth de
@@ -244,13 +290,21 @@ Cuatro stores, sin middleware `devtools`. Solo el carrito persiste.
 
 ```ts
 data: Record<string, MenuPublico>
-fetchMenu(slug)   // no-op si ya está cacheado o si loading === true
-clearCache()
+estadoAt: Record<string, number>   // instante (ms) en que se obtuvo el estado de cada local
+fetchMenu(slug)         // no-op si ya está cacheado o si loading === true
+refrescarEstado(slug)   // re-pide el menú pero solo reemplaza `estado` y `horario`
+clearCache()            // vacía data y estadoAt
 ```
 
 Cada página cliente llama `fetchMenu(slug)` en un `useEffect` y lee de
-`data[slug]`. El guard `if (get().data[slug] || get().loading) return` evita
-fetches duplicados al navegar entre páginas del mismo local.
+`data[slug]`; además `useEstadoLocal` (§8.6) lo llama por su cuenta. El guard
+`if (get().data[slug] || get().loading) return` evita fetches duplicados al
+navegar entre páginas del mismo local.
+
+`estadoAt` ancla el texto relativo del aviso ("hoy", "mañana"): se calcula contra
+el momento en que se obtuvo el estado, no contra el render. `refrescarEstado`
+no usa el flag `loading`, no toca el catálogo que el cliente está mirando y,
+si falla la red, deja el último estado conocido.
 
 **Limitación conocida:** el flag `loading` es global, no por slug. Si dos slugs
 se pidieran en paralelo (no ocurre hoy, la navegación es por tenant), el segundo
@@ -280,8 +334,11 @@ Persistido en `localStorage` bajo `vinto-cart` vía el middleware `persist`.
 
 ### `authStore.ts` — sesión del admin
 
-- Estado: `token`, `adminId`, `sesionExpirada`.
+- Estado: `token`, `adminId`, `sesionExpirada`, `sesionExpiradaEn` (instante en
+  ms del vencimiento, para decir a qué hora se cortó el aviso de pedidos).
 - Token en `localStorage` bajo `vinto_admin_token`.
+- **La duración de la sesión no vive en el front.** Todo sale del claim `exp`, así
+  que si el backend cambia la duración (hoy 12 h) no hay nada que tocar acá.
 - El payload del JWT se **decodifica** con `atob` (sin librería, `try/catch` →
   `null`): `adminId` probando `adminId`, `sub`, `nameid`; y el claim `exp`
   (`getTokenExpMs`, exportado, lo usa `ProtectedRoute`). Es decodificación, no
@@ -291,9 +348,17 @@ Persistido en `localStorage` bajo `vinto-cart` vía el middleware `persist`.
   `sesionExpirada: true` (el login muestra "Tu sesión expiró"). Un refresh en
   `/admin/pedidos` con token vigente no parpadea al login.
 - `expirarSesion()` es el **único camino de cierre por vencimiento** (timer de
-  `ProtectedRoute`, 401 del interceptor, carga inicial). Es no-op si ya no hay
-  token. `logout()` es el cierre voluntario y no marca `sesionExpirada`.
-  `guardarToken` la resetea a `false`.
+  `ProtectedRoute`, 401 del interceptor, factory de SignalR, carga inicial). Es
+  no-op si ya no hay token. `logout()` es el cierre voluntario y no marca
+  `sesionExpirada`. `guardarToken` la resetea a `false`.
+  - `sesionExpiradaEn` es el `exp` del token si ya había pasado; en un 401 con el
+    token todavía vigente (revocado, reloj corrido) es "ahora".
+  - **Si `localStorage` ya trae otro token vigente** (otra pestaña volvió a
+    iniciar sesión), `expirarSesion()` lo adopta en vez de cerrar y de borrarlo.
+- `sesionVigente()` (exportada): lee `localStorage` y devuelve si hay un token
+  vigente; si venció, llama `expirarSesion()` y devuelve `false`. La usa la factory
+  de SignalR (§7). Devuelve un booleano a propósito: el JWT no sale del store hacia
+  el hub.
 - `isAuthenticated()` es `token !== null && !tokenVencido(token)`. Hoy nadie la
   consume: `ProtectedRoute` se suscribe directo a `token`.
 
@@ -322,13 +387,35 @@ Es el puente entre SignalR y la UI. Guarda:
 ```ts
 .withUrl(`${BASE_URL}/hubs/pedidos`, {
   withCredentials: true,
-  accessTokenFactory: () => localStorage.getItem('vinto_admin_token') ?? '',
+  accessTokenFactory: ticketParaHub,
 })
 .withAutomaticReconnect({
   nextRetryDelayInMilliseconds: ({ previousRetryCount }) =>
     [0, 2000, 10000][previousRetryCount] ?? 30000,
 })
 ```
+
+- **El hub no recibe nunca el JWT de sesión: recibe un ticket.** El backend rechaza
+  el JWT en el hub (query y header). La factory (`ticketParaHub`, en el hook) hace:
+  si `sesionVigente()` → `pedirTicketHub()` (`POST /api/Hub/ticket`, con el JWT en
+  el header `Authorization` que pone el interceptor de Axios) y devuelve
+  `{ ticket }`; si no hay sesión vigente devuelve `''` sin pedir nada.
+  - **Sin caché, un ticket por llamada.** El ticket es un JWT de 60 s
+    (`expiraEnSegundos`), stateless y reutilizable hasta vencer, pero igual se pide
+    uno nuevo cada vez. SignalR invoca la factory **dos veces por intento de
+    conexión** (en el `negotiate`, donde viaja como `Authorization: Bearer`, y al
+    abrir el WebSocket, donde viaja en `?access_token=`) y otra vez en cada
+    reconexión: son 2 requests al endpoint por intento.
+  - **401 del endpoint** (sesión vencida, o cuenta deshabilitada, que responde 401
+    con `{ mensaje }`): el interceptor de Axios llama `expirarSesion()`. Una cuenta
+    deshabilitada termina como "Tu sesión expiró"; no se distingue por el cuerpo.
+  - **Cualquier otro fallo** (red, 5xx, 404 si el backend es viejo) hace tirar la
+    factory: el intento falla y se reintenta con el backoff de abajo. Sin el
+    endpoint nuevo el hub nunca conecta (banner "Sin conexión en vivo").
+  - Una conexión ya abierta **no** se corta al vencer el ticket: solo sirve para abrir.
+  - **Despliegue:** front y backend tienen que salir juntos. El backend nuevo
+    rechaza el JWT en el hub (el front viejo se queda sin avisos en vivo) y el front
+    nuevo necesita `/api/Hub/ticket`.
 
 - **La reconexión no se rinde.** El default de SignalR reintenta 4 veces (0, 2,
   10, 30 s) y queda `Disconnected` en silencio. Acá, tras los primeros
@@ -376,6 +463,27 @@ SignalR no reenvía lo emitido mientras el cliente estaba caído. Al subir
 Los toasts se apilan en un contenedor `position: fixed` abajo a la derecha,
 renderizado por `AdminLayout`.
 
+### Vencimiento de la sesión en pleno servicio
+
+Al vencer el JWT el panel deja de avisar pedidos nuevos: `ProtectedRoute` llama
+`expirarSesion()`, redirige al login y el desmontaje de `AdminLayout` hace
+`connection.stop()`. El servidor no corta el WebSocket por sí solo, así que el
+corte lo hace el front. Como el dueño puede no estar mirando, hay tres capas:
+
+1. **Pre-aviso (`SesionPorVencerBanner`, en `AdminLayout`).** Desde 30 min antes
+   del `exp`: "Tu sesión vence a las HH:MM (en N min)" y botón "Volver a
+   ingresar", que hace `logout()` (no hay refresh de token: renovar es volver a
+   loguearse). Pasa a rojo a los 5 min. Estilo admin, sin crema ni vino.
+2. **Aviso sonoro (`useAlertaSesionExpirada`, en `LoginPage`).** Si el
+   vencimiento es de hace menos de 2 min: pitido de tres tonos (Web Audio, sin
+   archivos) cada 15 s, hasta 40 veces (~10 min), y el título de la pestaña pasa
+   a "⚠ Sesión vencida · Vinto". Se corta con el primer toque o tecla y restaura
+   el título. Quien abre el panel horas después no escucha nada. Es best-effort:
+   sin interacción previa en la página el navegador puede bloquear el audio y
+   queda solo el título.
+3. **Cartel del login.** "Tu sesión expiró a las HH:MM" (o "ayer a las…") y
+   que desde entonces no hay avisos, pero los pedidos están en la lista.
+
 ---
 
 ## 8. Flujos principales
@@ -383,17 +491,25 @@ renderizado por `AdminLayout`.
 ### 8.1 Compra (cliente)
 
 1. **`MenuPage`** (`/:slug`) — `fetchMenu(slug)` + `asegurarSlug(slug)`.
-   Muestra el local (logo, dirección, horarios, link de WhatsApp) y las
-   categorías. `local.esActivo` define si el local está abierto; si está
-   cerrado, las páginas de producto/carrito bloquean el avance
-   (`isOpen = menu?.local.esActivo ?? true`, con default permisivo si el menú
-   todavía no cargó).
+   Muestra el local (logo, dirección, link de WhatsApp), el estado de atención
+   y las categorías; los horarios se listan en el modal de info. Si el local
+   está cerrado, el menú **se puede recorrer igual** pero no se puede avanzar al
+   pedido. Lo decide `useEstadoLocal` a partir de `menu.estado.estaAbierto`
+   (default permisivo `true` mientras el menú no cargó); ya no se lee
+   `local.esActivo`. Detalle en §8.6.
 2. **`ProductosPage`** (`/:slug/productos/:categoriaId`) — grilla de productos
-   de la categoría, con precio tachado si hay `precioConDescuento`.
+   de la categoría, con precio tachado si hay `precioConDescuento`. Cerrado:
+   banner con el aviso y el botón "+" deshabilitado.
 3. **`ExtrasPage`** (`.../:productoId`) — selección de variante (si
-   `tieneVariantes`) y de extras; `agregarItem` al carrito.
+   `tieneVariantes`) y de extras; `agregarItem` al carrito. Cerrado: `canAdd`
+   es falso y en lugar del CTA se muestra el aviso.
 4. **`CarritoPage`** — edición de cantidades, `CuponInput` no aparece acá.
-5. **`CheckoutPage`** — es la página más densa del repo:
+   Cerrado: aviso sobre el footer y "Continuar" deshabilitado.
+5. **`CheckoutPage`** — es la página más densa del repo. Cerrado: aviso y botón
+   de envío deshabilitados, y `handleSubmit` retorna sin enviar. Si igual el
+   backend rechaza el pedido con **409 `LocalCerrado`** (el estado cambió desde
+   la última carga), se muestra su `mensaje`, el carrito y los datos del form
+   quedan como están y se llama `refrescarEstado` (§8.6).
    - datos del cliente (nombre, teléfono);
    - **entrega**: `Retira` (retiro en el local; es el valor por defecto) o
      `Delivery`. **El valor del contrato con la API es `'Retira'`**, no
@@ -462,7 +578,15 @@ Login → JWT en `localStorage` → `adminId` decodificado del token → todas l
 llamadas admin lo usan como parámetro o lo derivan del token en el backend.
 `AdminLayout` monta la conexión SignalR, el chip y el banner de conexión
 (`ConexionIndicador`), el banner de estado de MercadoPago y el stack de toasts.
-Sidebar fija de 200px; el contenido lleva `marginLeft: 200`.
+
+**Sidebar responsive.** Desde `md` (768px) la sidebar es fija de 200px y el
+contenido lleva `md:ml-[200px]`. Por debajo es un **drawer**: `AdminLayout` guarda
+`menuAbierto`, el header muestra un botón hamburguesa de 44×44 (`md:hidden`,
+`aria-label="Abrir menú"`, `aria-expanded`), la sidebar entra con
+`translate-x` y un fondo `bg-black/40` (`md:hidden`) la cierra al tocar afuera.
+También se cierra al elegir un ítem del menú (`onClick` de cada `NavLink`).
+`Sidebar` recibe `abierto` / `onCerrar`; `AdminLayout` memoiza `cerrarMenu` con
+`useCallback`. El padding del contenido es `px-4 md:px-8`.
 
 **`PedidosPage` — paginación.** 25 pedidos por página (`PAGE_SIZE`), página y
 filtros en estado local; el backend responde `{ items, total, totalPages }`.
@@ -479,6 +603,12 @@ Siguiente. Detalles que importan:
 - Se refetchea con cada `ultimoNuevoPedido` / `ultimoPagoConfirmado` y al
   reconectar (con el diff de §7).
 - Las opciones de filtro de forma de entrega son `Delivery` y `Retira`.
+
+**`MiLocalPage` — tres bloques con guardado independiente.** (1)
+`SeccionUrlPublica`, (2) `SeccionHorarios` (estado, cierre manual y horarios,
+§8.6) y (3) el formulario de datos del local, cuyo "Guardar cambios" (`PATCH
+/Administrador/{id}/local`) **ya no incluye `esActivo` ni `horarios`**: el viejo
+toggle abierto/cerrado y el textarea de horarios libres se eliminaron.
 
 **`MiLocalPage` → `SeccionUrlPublica`.** Muestra el link público
 (`window.location.origin + '/' + admin.slugLocal`), con "Copiar link" y "Cambiar
@@ -538,7 +668,7 @@ tres URLs a mano (`og:url`, `og:image`, `twitter:image`).
 | Acento / CTA | vino `#73223a` (hover `#651d33`) | botón primario `#1a1a1a` |
 | Bordes | `#e8e1d4` (cálido) | `#e8e8e8`, `#d0d0d0` |
 | Superficie | `#ede5d3` | blanco |
-| Orientación | mobile-first | desktop-first, sidebar 200px |
+| Orientación | mobile-first | desktop-first; sidebar 200px desde `md`, drawer debajo |
 
 Comunes: texto `#1a1a1a`, secundario `#6b6258`, positivo `#2d5a27`, error
 `#a92020`, `rounded-none`, sin gradientes. Las fuentes se cargan por Google
@@ -550,6 +680,133 @@ Fonts desde `index.html`.
 patrón a seguir para pantallas admin nuevas.
 
 El `LoginPage` es admin: `#fafaf9`, logo cuadrado negro, sin vino ni Fraunces.
+
+### 8.6 Horarios y estado del local
+
+Reemplaza al viejo toggle `esActivo` y al texto libre `horarios` (commits
+`c93a441` y `0a4a8be`). Está en producción.
+
+**Quién decide.** El backend. Calcula `estado` y el front **no replica** la
+lógica de días/turnos para saber si está abierto: solo lee `estaAbierto` y
+formatea. Modelos (`src/types/index.ts`):
+
+| Tipo | Campos |
+|---|---|
+| `HorarioDia` | `diaSemana` (`System.DayOfWeek`: 0 = domingo … 6 = sábado), `modo` (`'Cerrado' \| '24h' \| 'Turnos'`), `turno1Apertura/Cierre`, `turno2Apertura/Cierre` (`"HH:mm"` o `null`). Cierre menor que apertura = el turno termina al día siguiente. |
+| `EstadoLocal` | `estaAbierto`, `motivo` (`'SinHorarios' \| 'Horario' \| 'CerradoManualmente'`), `proximoCambio` (instante UTC ISO: próximo cierre si está abierto, próxima apertura si está cerrado, `null` si no hay) |
+| `HorariosLocal` (panel) | `zonaHoraria`, `cerradoManualmente`, `dias`, `estado` |
+| `HorarioPublico` (menú) | `zonaHoraria`, `dias` — mismo formato, sin el estado de cierre |
+
+`dias` viene con **0 elementos** (sin horarios fijos: abierto siempre, salvo
+cierre manual) o con **exactamente 7**. `MenuPublico` suma `estado` (se calcula
+en cada request: es lo único del menú que cambia con la hora) y `horario`.
+`LocalPublico` ya no declara `esActivo` ni `horarios`.
+
+**Endpoints.** `GET`/`PUT /Administrador/local/horarios` (el `PUT` manda
+`{ zonaHoraria, dias }`) y `PATCH /Administrador/local/cierre-manual`
+(`{ cerrado }` → `EstadoLocal`). El local sale del JWT. Un `PUT` inválido
+responde 400 `{ mensaje, errores[] }`; un 409 significa que los horarios
+cambiaron desde otro lugar mientras se editaba (el payload no lleva versión: el
+criterio de conflicto es del backend). **No confundir con el otro 409**, el del
+`POST` de pedido (`codigo: 'LocalCerrado'`); son endpoints distintos.
+
+#### Regla: las horas, siempre con la zona del local
+
+`src/utils/horarios.ts` formatea con `Intl.DateTimeFormat` y
+`timeZone: zonaHoraria`, **nunca** con la zona del navegador. La única
+conversión real es `proximoCambio` (UTC) → zona del local; los `"HH:mm"` de los
+turnos ya están en esa zona y se muestran tal cual. Lo exporta:
+
+- `NOMBRES_DIAS` y `ORDEN_DIAS`: el único lugar del mapeo domingo = 0 ↔ semana
+  de lunes a domingo en pantalla.
+- `cuandoEn(iso, zona, ahora, 'cierra' | 'abre')`: `"23:00"`, `"hoy a las
+  10:00"`, `"mañana a las 10:00"`, `"el lunes a las 10:00"`, y a 7 días o más
+  suma la fecha (`"el lunes 27/10 a las 10:00"`). La diferencia de días se
+  cuenta en el calendario de la zona del local. Devuelve `null` si la zona no
+  es válida y cada caller cae a un texto sin hora. `ahora` es parámetro (ms) para
+  que "hoy / mañana" quede anclado al momento en que se obtuvo el estado.
+- Textos de la tienda: `avisoLocalAbierto` (`"Abierto ahora · cierra 23:00"`) y
+  `avisoLocalCerrado` (`"Cerrado · abre mañana a las 10:00"` solo si
+  `motivo === 'Horario'` y hay `proximoCambio`; en cierre manual o sin próxima
+  apertura: `"Cerrado por el momento"`, porque nadie sabe cuándo se reabre).
+- `leerLocalCerrado(err)`: interpreta el 409 del pedido; `null` si es otro error.
+- `resumirHorarios(dias)`: agrupa días consecutivos con el mismo horario
+  (`"Lunes a viernes: 10:00–14:00 y 19:00–23:00"`; todos iguales → `"Todos los
+  días"`; todos 24 h → `"Abierto 24 hs"`; sin días → lista vacía).
+
+#### Panel — `src/components/admin/horarios/`
+
+`MiLocalPage` monta `<SeccionHorarios />` encima del formulario. Estado, cierre
+manual y horarios se cargan y **se guardan aparte** del formulario (otros
+endpoints, otra validación): el "Guardar cambios" de Mi local no los toca.
+
+- **`SeccionHorarios`** — contenedor. Carga `getHorariosLocal()` con estados
+  cargando / error con "Reintentar" / ok. Se mantiene al día solo: `setTimeout`
+  hasta `proximoCambio` + 1 s (tope int32) y refetch en `visibilitychange`. Ese
+  refresco **solo actualiza `cerradoManualmente` y `estado`**, no `dias`, para no
+  pisar un borrador a medio editar. `claveEditor` remonta el editor cuando llega
+  una carga nueva (inicial o "Recargar horarios" tras un 409).
+- **`EstadoLocalBloque`** — el "bloque de estado": indicador cuadrado verde/rojo,
+  `describirEstado` y una línea de detalle, más el **cierre manual**: "Cerrar
+  ahora" (con confirmación inline en rojo) o "Reabrir" (`setCierreManual`).
+  El cierre manual gana sobre el horario (`motivo: 'CerradoManualmente'`).
+  Cerrar fuera de horario está permitido y avisa que tampoco abrirá en su
+  próximo horario hasta reabrir; reabrir fuera de horario avisa que el local
+  sigue cerrado por horario.
+- **`EditorHorarios`** — switch "Usar horarios" (apagado = `dias: []`), los 7
+  días de lunes a domingo, modo por día (Cerrado / 24 hs / Turnos), hasta dos
+  turnos, "Copiar a todos los días" y la marca "(cierra al día siguiente)".
+  Barra pegajosa abajo con "Guardar horarios" / "Descartar". "Cambios sin
+  guardar" compara el JSON del payload contra lo guardado: volver al valor
+  original deja de contar como cambio. **`zonaHoraria` no se edita**: se
+  reenvía la del GET y se muestra como texto. Error 400: mensaje + lista; 409:
+  botón "Recargar horarios".
+- **`horariosUtils.ts`** — `aBorrador` / `aPayload`, `copiarDia`,
+  `cruzaMedianoche`, `describirEstado` y `leerErrorHorarios`. Sin horarios
+  guardados los 7 días arrancan en `24h`, para que encender el switch no deje el
+  local cerrado sin querer. Los turnos solo viajan con modo `Turnos` (el backend
+  rechaza turnos en un día Cerrado o 24 h) pero se conservan en el borrador por
+  si se vuelve a Turnos.
+
+Textos del panel (`describirEstado`): `"Cerrado manualmente"`, `"Abierto siempre
+(sin horarios)"`, `"Abierto ahora · cierra …"`, `"Cerrado por horario · abre …"`.
+Estos componentes nacieron mobile-friendly (áreas táctiles de 44 px, inputs
+`text-base md:text-sm`, botones a ancho completo bajo `sm`); es una práctica de
+esta sección, no de todo el panel.
+
+#### Tienda — `useEstadoLocal(slug)`
+
+Lo usan `MenuPage`, `ProductosPage`, `ExtrasPage`, `CarritoPage` y
+`CheckoutPage`. Devuelve `{ abierto, aviso, avisoAbierto }`.
+
+- **Se carga solo:** llama `fetchMenu(slug)`, así que funciona entrar directo al
+  carrito o al checkout, o recargar la página de un producto (el crash de ese
+  caso se arregló en `0a4a8be`).
+- **Default permisivo:** sin menú todavía `abierto = true`; si el local en
+  realidad está cerrado lo ataja el backend al crear el pedido (409).
+- **Se refresca solo:** `setTimeout` hasta `proximoCambio` + 1 s y refetch al
+  **volver a la pestaña** (`visibilitychange`), con un mínimo de 30 s entre
+  refrescos (`MIN_ENTRE_REFRESCOS_MS`). El menú es el único endpoint con el
+  estado, así que cada refresco re-pide el menú entero y `refrescarEstado` se
+  queda solo con `estado` y `horario`.
+- **Catálogo navegable con el local cerrado.** Se puede ver el menú y la lista
+  de productos; lo que se bloquea es avanzar: el "+" de `ProductosPage`, el CTA
+  de `ExtrasPage`, "Continuar" en `CarritoPage` y el envío en `CheckoutPage`.
+  `MenuPage` lo dice explícito ("Podés ver el menú, pero por ahora no se pueden
+  hacer pedidos").
+- **409 `LocalCerrado` en el checkout.** Puede pasar aunque la UI estuviera
+  habilitada (el local cerró entre la última carga y el envío). `CheckoutPage`
+  usa `leerLocalCerrado`: muestra el `mensaje` del backend, **no vacía el
+  carrito ni los datos del form** y llama `refrescarEstado` para que el aviso y
+  el botón reflejen el estado real. Cualquier otro fallo sigue mostrando "No se
+  pudo enviar el pedido…".
+
+#### Legado que el front ya no usa
+
+`local.esActivo` y `local.horarios` (texto libre) del backend **ya no se leen ni
+se envían**: no están en `LocalPublico`, `MiLocalPage` no los edita y
+`SeccionUrlPublica` no los reenvía al guardar el slug. Quedan dos restos
+inertes, ver §11 (`Administrador.horarios`, `updateAdministrador`).
 
 ---
 
@@ -623,7 +880,7 @@ define las URLs del bundle de producción.
 
 ## 11. Deuda técnica y contradicciones detectadas
 
-Inventario del estado real al 2026-10-07, sin cambios aplicados al código.
+Inventario del estado real al 2026-10-21, sin cambios aplicados al código.
 
 ### Entorno y repo
 
@@ -633,55 +890,122 @@ Inventario del estado real al 2026-10-07, sin cambios aplicados al código.
    llamada y las imágenes y SignalR rotos. Debería declarar las dos variables,
    con `/api` en la primera.
 2. **`.env.example` está en UTF-16 LE con BOM y CRLF** (verificado por bytes:
-   `ff fe` al inicio). Vite parsea con `dotenv`, que asume UTF-8: la primera
-   clave puede leerse con basura o no leerse. Debería ser UTF-8 sin BOM.
-3. **`.env.development` ni versionado ni ignorado.** `.gitignore` solo cubre
-   `.env`, así que `git status` lo muestra como `??`. Decidir: ignorarlo
-   (`.env.development`) o versionarlo si solo lleva URLs locales. Hoy un
-   `git add .` lo commitea por accidente.
-4. **Falta `.gitattributes`.** `core.autocrlf=true` en la máquina de desarrollo
-   y finales de línea mixtos en el repo: `src/config.ts`, `.env.example` y el
-   workflow de GitHub están en CRLF; el resto, en LF.
+   `ff fe` al inicio; git lo trata como binario, `i/-text`). Vite parsea con
+   `dotenv`, que asume UTF-8: la primera clave puede leerse con basura o no
+   leerse. Debería ser UTF-8 sin BOM.
+3. **`.env.development` está ignorado, pero no hay plantilla ni nada que fuerce
+   su contenido.** Resuelto el riesgo del `git add .` (se ignora desde
+   `22fbbf0`), queda la trampa de entornos (§3): sin el archivo, o con él
+   apuntando a otro lado, `npm run dev` cae a `.env` y puede pegarle a la API
+   real. Como `.env.example` está roto (1), un clon nuevo no tiene de dónde
+   copiar el contenido correcto.
+4. **Falta `.gitattributes`.** `core.autocrlf=true` en la máquina de desarrollo:
+   en el índice solo el workflow de GitHub está en CRLF; otros 25 archivos
+   (entre ellos `src/config.ts`) están en LF en el índice pero aparecen en CRLF
+   en el working tree, y `.gitignore` tiene finales mixtos. Un `.gitattributes`
+   (`* text=auto eol=lf`) eliminaría el ruido.
 
 ### Código
 
 5. **`updateAdministrador` es código muerto** (`adminApi.ts`, sin call sites).
    `MiLocalPage` usa `updateLocalData`. Además es la única ruta en minúscula
-   (`/administrador/{id}`) y su payload usa `esAbierto`, que el panel ya no usa.
-6. **`authStore.isAuthenticated()` no tiene consumidores.** `ProtectedRoute` se
-   suscribe a `token` directamente. Está bien mantenida, pero es API sin uso.
-7. **`ProductosCategoriaPage.tsx` es un stub muerto** de tres líneas, sin
-   importar en ningún lado (ni siquiera en el `lazy` de `App.tsx`).
-8. **Assets sin uso:** `src/App.css` (nadie lo importa; `main.tsx` solo importa
-   `index.css`) y `src/assets/hero.png`, `react.svg`, `vite.svg`.
-9. **DTOs repartidos en dos lugares.** Descuentos, cupones, comanda, ticket,
-   stock y comentarios viven en `adminApi.ts`, no en `types/index.ts`.
-10. **`SERIF` redeclarado en 13 archivos** (12 de cliente/marketing/compartidos
+   (`/administrador/{id}`) y su payload declara `esAbierto`, un campo que **ya
+   no existe en el tipo `Administrador`** ni se usa en ningún lado.
+6. **`Administrador.horarios: string | null` no tiene lectores.** Es el texto
+   libre anterior a §8.6: `types/index.ts` lo sigue declarando, pero ninguna
+   pantalla lo lee ni lo envía (`MiLocalPage` y `SeccionUrlPublica` ya no lo
+   usan). Se puede borrar del tipo.
+7. **Lógica de refresco duplicada.** `useEstadoLocal` (tienda) y
+   `SeccionHorarios` (panel) repiten el patrón `setTimeout` a `proximoCambio` +
+   `visibilitychange`, con su propia copia de `MAX_TIMER_MS`. Difieren a
+   propósito en el throttle (la tienda espera 30 s entre refrescos; el panel
+   refresca en cada vuelta a la pestaña), pero hoy no comparten código.
+8. **El refresco del estado de la tienda re-pide el menú completo**
+   (`refrescarEstado` llama `getMenu` y descarta el catálogo): es el único
+   endpoint que trae `estado`. Con catálogos grandes y clientes que dejan la
+   pestaña abierta, es payload de más; el 30 s de throttle lo acota.
+9. **Las fechas de los pedidos en el panel usan la zona del navegador.**
+   `PedidosPage`, `PedidoDetallePage` e `ImpresionModal` formatean con
+   `toLocaleTimeString('es-AR', …)` sin `timeZone`. La regla "horas con la zona
+   del local" (§8.6) rige para horarios y estado, no para esto. Si el dueño
+   abre el panel desde una zona distinta a la del local, la hora que ve
+   depende del navegador (y de si `fecha` llega con offset, algo que el front
+   no controla).
+10. **Supuesto del backend que el front no puede comprobar.** Desde `c93a441`,
+    `PATCH /Administrador/{id}/local` (Mi local y `SeccionUrlPublica`) ya no manda
+    `esActivo` ni `horarios`. Se asume que el backend deja esos campos como están
+    cuando faltan y que el estado real depende solo de los endpoints de §8.6.
+    Pendiente de confirmar en el repo del backend.
+11. **`authStore.isAuthenticated()` no tiene consumidores.** `ProtectedRoute` se
+    suscribe a `token` directamente. Está bien mantenida, pero es API sin uso.
+12. **`ProductosCategoriaPage.tsx` es un stub muerto** de tres líneas, sin
+    importar en ningún lado (ni siquiera en el `lazy` de `App.tsx`).
+13. **Assets sin uso:** `src/App.css` (nadie lo importa; `main.tsx` solo importa
+    `index.css`) y `src/assets/hero.png`, `react.svg`, `vite.svg`.
+14. **DTOs repartidos en dos lugares.** Descuentos, cupones, comanda, ticket,
+    stock y comentarios viven en `adminApi.ts`, no en `types/index.ts`.
+15. **`SERIF` redeclarado en 13 archivos** (12 de cliente/marketing/compartidos
     más `SeccionUrlPublica` en admin). Colores de marca como hex literal por
     todo el código, sin tokens ni tema.
-11. **El catch-all `*` manda a `/admin/login`** en vez de a un 404 o a la
+16. **El catch-all `*` manda a `/admin/login`** en vez de a un 404 o a la
     landing (§5).
-12. **Nominatim (OpenStreetMap) se consulta directo desde el navegador**, sin
+17. **Nominatim (OpenStreetMap) se consulta directo desde el navegador**, sin
     `User-Agent` propio ni API key. Aceptable para volumen bajo, pero su rate
     limit degrada en silencio el autocompletado (los errores se ignoran).
-13. **`menuStore.loading` es global, no por slug** (§6).
-14. **`ConfirmacionPage` depende de `location.state`**: un refresh pierde los
+18. **`menuStore.loading` es global, no por slug** (§6).
+19. **`ConfirmacionPage` depende de `location.state`**: un refresh pierde los
     datos del pedido recién creado.
-15. **`ProtectedRoute` solo vigila tokens con claim `exp`.** Si el backend
+20. **`ProtectedRoute` solo vigila tokens con claim `exp`.** Si el backend
     emitiera un JWT sin `exp`, no habría detección proactiva (queda el 401).
-16. **El diff de pedidos perdidos tiene un hueco por diseño:** si el admin está
+21. **El diff de pedidos perdidos tiene un hueco por diseño:** si el admin está
     en página 2 o con filtros durante la caída, al reconectar la lista se
     refresca pero no se avisa de los pedidos nuevos.
-17. **El hero de la landing depende de que exista el slug `ejemplo`** en el
+22. **El hero de la landing depende de que exista el slug `ejemplo`** en el
     backend de cada entorno (§8.4).
-18. **El dominio `vintoapp.com` aparece escrito a mano** en `index.html` (tres
+23. **El dominio `vintoapp.com` aparece escrito a mano** en `index.html` (tres
     URLs absolutas de OG/Twitter) y como texto en `LandingPage` (paso 3). No es
     ruteo de API, pero hay que actualizarlo a mano si cambia el dominio.
+24. **El aviso de sesión vencida solo vive dentro de la pestaña.** No usa la
+    `Notification API` del sistema (pediría un permiso que hoy la app no pide), así
+    que con el navegador minimizado o la pestaña silenciada el dueño no se entera
+    hasta volver. El panel tampoco tiene sonido para pedidos nuevos.
+25. **Sin sincronización entre pestañas del estado de sesión.** `expirarSesion()`
+    adopta un token más nuevo de `localStorage`, pero no hay listener de `storage`:
+    si se renueva en una pestaña, el pre-aviso de otra sigue hasta su propio `exp`,
+    y un `logout()` en una pestaña termina como "Tu sesión expiró" en las demás
+    (por el 401).
 
-### Contradicciones corregidas en esta pasada
+### Contradicciones corregidas el 2026-10-21
+
+La feature de horarios (§8.6) dejó viejas estas afirmaciones. Quedan registradas
+para no reintroducirlas:
+
+- "`local.esActivo` define si el local está abierto" (`isOpen =
+  menu?.local.esActivo ?? true`) → lo define `menu.estado.estaAbierto` vía
+  `useEstadoLocal`; `esActivo` ya no se lee.
+- "Mi local tiene un toggle abierto/cerrado y un textarea de horarios dentro del
+  formulario" → son `SeccionHorarios` (§8.6), con guardado propio; el
+  formulario ya no manda `esActivo` ni `horarios`.
+- "Sidebar fija de 200px; el contenido lleva `marginLeft: 200`" → desde `md`;
+  debajo es un drawer con hamburguesa.
+- "`.env.development` no está versionado ni ignorado" → está en `.gitignore`
+  desde `22fbbf0`; la trampa ahora es que nada fuerza su contenido (§3).
+- "No existen `components/ui/` ni `utils/`" → existe `utils/horarios.ts`
+  (`components/ui/` es un directorio vacío sin versionar).
+- "`resolveImageUrl` usa `startsWith('http')`" → regex `^https?://` insensible a
+  mayúsculas, y antepone `/` si la ruta relativa no lo trae.
+- "`menuStore` expone `data`, `fetchMenu` y `clearCache`" → suma `estadoAt` y
+  `refrescarEstado`.
+- "`src/config.ts`, `.env.example` y el workflow están en CRLF; el resto, en LF"
+  → en el índice solo el workflow es CRLF; el resto es LF y 25 archivos aparecen
+  en CRLF solo en el working tree por `autocrlf` (§11, ítem 4).
+- "`updateAdministrador` usa `esAbierto`, que el panel ya no usa" → el campo ni
+  siquiera existe ya en el tipo `Administrador` (§11, ítem 5).
+
+### Contradicciones corregidas el 2026-10-07
 
 La versión anterior de estos documentos afirmaba cosas que el código ya no
-cumplía. Quedan registradas para no reintroducirlas:
+cumplía:
 
 - "Sin lazy loading, bundle único" → todas las rutas son `React.lazy`.
 - "`ProtectedRoute` no valida expiración" → vigila `exp` con timer y
@@ -716,6 +1040,11 @@ cumplía. Quedan registradas para no reintroducirlas:
 | **`codigoSeguimiento`** | Código público del pedido; llave para consultar estado de pago y para el mensaje de WhatsApp. |
 | **Comanda** | Ticket de cocina: qué preparar, sin precios. |
 | **Ticket** | Comprobante para el cliente: con precios, descuentos, envío y vuelto. |
+| **`estado`** (`EstadoLocal`) | Lo que el backend dice del local ahora: `estaAbierto`, `motivo` y `proximoCambio`. Viaja en el menú público y en `getHorariosLocal`. |
+| **`motivo`** | Por qué el estado es el que es: `'SinHorarios'` (abierto siempre), `'Horario'` (según la grilla de días) o `'CerradoManualmente'` (gana sobre el horario). |
+| **`proximoCambio`** | Instante UTC (ISO) del próximo cierre (si está abierto) o apertura (si está cerrado); `null` si no hay. Se muestra siempre en la `zonaHoraria` del local. |
+| **`zonaHoraria`** | Zona IANA del local (ej. `America/Argentina/Cordoba`). Se muestra, no se edita desde el panel. |
+| **Cierre manual** | Cierre del local a mano desde el panel (`setCierreManual`); dura hasta que el dueño lo reabre, aunque pase el horario. |
 | **`resumenWhatsApp`** | Texto del pedido ya formateado por el backend para mandar por WhatsApp. |
 | **`FormaEntrega`** | `'Retira'` (retiro) \| `'Delivery'`. |
 | **`FormaPago`** | `'Efectivo'` \| `'Transferencia'` \| `'Tarjeta'` (se muestra como "Mercado Pago"). |

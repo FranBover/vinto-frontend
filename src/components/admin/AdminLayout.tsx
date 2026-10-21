@@ -3,6 +3,7 @@ import Sidebar from './Sidebar'
 import NuevoPedidoToast from '../NuevoPedidoToast'
 import PagoConfirmadoToast from './PagoConfirmadoToast'
 import MercadoPagoStatusBanner from './MercadoPagoStatusBanner'
+import SesionPorVencerBanner from './SesionPorVencerBanner'
 import { ConexionBanner, ConexionChip } from './ConexionIndicador'
 import { usePedidosHub } from '../../hooks/usePedidosHub'
 import { useAuthStore } from '../../store/authStore'
@@ -88,6 +89,7 @@ export default function AdminLayout({ title, subtitle, actions, children }: Prop
         </header>
 
         <ConexionBanner state={connectionState} />
+        <SesionPorVencerBanner />
         <MercadoPagoStatusBanner />
 
         {/* Page content */}

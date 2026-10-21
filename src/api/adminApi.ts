@@ -32,6 +32,20 @@ export const loginAdmin = async (email: string, password: string): Promise<{ tok
   return data
 }
 
+// ── Hub de pedidos (SignalR) ──────────────────────────────────────────────────
+
+export interface TicketHub {
+  /** JWT de vida corta con audience propio: es lo único que acepta el hub. */
+  ticket: string
+  expiraEnSegundos: number
+}
+
+/** Pide un ticket para abrir el hub. No se cachea: cada llamada de la factory pide uno nuevo. */
+export const pedirTicketHub = async (): Promise<TicketHub> => {
+  const { data } = await apiClient.post<TicketHub>('/Hub/ticket')
+  return data
+}
+
 // ── Pedidos ───────────────────────────────────────────────────────────────────
 
 export interface PedidosFiltros {

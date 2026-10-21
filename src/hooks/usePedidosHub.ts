@@ -4,8 +4,21 @@ import {
   HubConnectionState,
   type HubConnection,
 } from '@microsoft/signalr'
+import { pedirTicketHub } from '../api/adminApi'
 import { BASE_URL } from '../config'
+import { sesionVigente } from '../store/authStore'
 import type { NuevoPedidoPayload, PagoConfirmadoPayload } from '../store/notificationsStore'
+
+// El JWT de sesión nunca llega al hub (ni en la URL ni en un header): cada llamada pide un ticket
+// de vida corta. Sin caché a propósito. SignalR la invoca dos veces por intento de conexión (en el
+// negotiate y al abrir el WebSocket) y otra vez en cada reconexión. Un 401 del endpoint lo atiende
+// el interceptor de Axios (expirarSesion()); cualquier otro error hace fallar el intento y SignalR
+// reintenta según el backoff de abajo.
+async function ticketParaHub(): Promise<string> {
+  if (!sesionVigente()) return ''
+  const { ticket } = await pedirTicketHub()
+  return ticket
+}
 
 interface UsePedidosHubOptions {
   adminId: number | null
@@ -44,7 +57,7 @@ export function usePedidosHub({
     const connection: HubConnection = new HubConnectionBuilder()
       .withUrl(`${BASE_URL}/hubs/pedidos`, {
         withCredentials: true,
-        accessTokenFactory: () => localStorage.getItem('vinto_admin_token') ?? '',
+        accessTokenFactory: ticketParaHub,
       })
       // Por defecto SignalR reintenta 4 veces (0, 2, 10 y 30 s) y se rinde en silencio.
       // Acá nunca se rinde: después de los primeros intentos sigue cada 30 s.

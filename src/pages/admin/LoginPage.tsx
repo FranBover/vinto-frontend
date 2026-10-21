@@ -2,12 +2,21 @@ import { useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import { loginAdmin } from '../../api/adminApi'
+import { useAlertaSesionExpirada } from '../../hooks/useAlertaSesionExpirada'
 import { useAuthStore } from '../../store/authStore'
+import { cuandoVence } from '../../utils/sesion'
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const guardarToken = useAuthStore(s => s.guardarToken)
   const sesionExpirada = useAuthStore(s => s.sesionExpirada)
+  const sesionExpiradaEn = useAuthStore(s => s.sesionExpiradaEn)
+
+  useAlertaSesionExpirada(sesionExpiradaEn)
+  // Se arma una vez al montar: el cartel no tiene que cambiar solo mientras se lo lee.
+  const [cuandoExpiro] = useState(() =>
+    sesionExpiradaEn !== null ? cuandoVence(sesionExpiradaEn, Date.now()) : null
+  )
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -90,9 +99,12 @@ export default function LoginPage() {
               className="border-l-4 px-4 py-3"
               style={{ backgroundColor: '#fdecec', color: '#a92020', borderLeftColor: '#a92020' }}
             >
-              <p className="font-bold text-sm">Tu sesión expiró</p>
+              <p className="font-bold text-sm">
+                Tu sesión expiró{cuandoExpiro && ` ${cuandoExpiro}`}
+              </p>
               <p className="text-xs mt-0.5 leading-relaxed">
-                Por seguridad, volvé a iniciar sesión para seguir.
+                Desde entonces el panel no te avisa de pedidos nuevos. Volvé a iniciar sesión: los que
+                entraron mientras tanto están en la lista de pedidos.
               </p>
             </div>
           )}

@@ -12,12 +12,25 @@ El detalle largo (arquitectura, flujos, decisiones, deuda) está en
 
 ```bash
 npm run dev       # servidor de desarrollo (HMR), puerto 5173
+npm run dev -- --mode production   # dev contra la API de PRODUCCIÓN (ver Entornos)
 npm run build     # tsc -b && vite build  ← el type-check es parte del build
 npm run lint      # ESLint
 npm run preview   # sirve dist/ localmente
 ```
 
 No hay test runner configurado. `npm run build` es la única verificación real.
+
+## Entornos
+
+Vite carga `.env` y después `.env.[modo]` (el segundo gana).
+
+- **`.env.development` (ignorado por git) tiene que apuntar a localhost**
+  (`:5202`): es lo que impide que `npm run dev` pegue a producción si el `.env`
+  local trae URLs de prod. Para probar contra producción no lo edites: usá
+  `npm run dev -- --mode production`.
+- **`.env.production` es el único `.env` real versionado**: lo usa el build de CI
+  (y `npm run build` local). `.env.example` está desactualizado, no lo copies
+  (CONTEXT §11).
 
 ## Stack
 
@@ -48,6 +61,20 @@ de config) · Zustand 5 · React Router 7 (BrowserRouter) · Axios · SignalR
 - **Contrato con la API:** `FormaEntrega = 'Retira' | 'Delivery'` (no `'Local'`).
   El slug público del local viene del backend como `slugLocal`.
 
+## Horarios y estado del local
+
+Detalle en [CONTEXT §8.6](docs/CONTEXT.md).
+
+- **Tienda:** `useEstadoLocal(slug)` en cada página cliente (se refresca en
+  `proximoCambio` y al volver a la pestaña). Local cerrado = catálogo navegable
+  pero sin poder avanzar al pedido; el 409 `LocalCerrado` del POST de pedido se
+  lee con `leerLocalCerrado`.
+- **Panel:** `src/components/admin/horarios/` (`SeccionHorarios`, en Mi local).
+  Estado, cierre manual y horarios se guardan por sus propios endpoints, no con
+  el "Guardar cambios" del formulario.
+- Formateo compartido en `src/utils/horarios.ts`. Si el local está abierto lo
+  decide el backend (`estado.estaAbierto`); el front no lo calcula.
+
 ## Sistema de diseño (dos lenguajes distintos)
 
 **Lado cliente y landing** (mobile-first): crema + Fraunces + vino.
@@ -61,7 +88,8 @@ de config) · Zustand 5 · React Router 7 (BrowserRouter) · Axios · SignalR
 | Superficie cálida / borde | `#ede5d3` / `#e8e1d4` |
 | Tipografía display | `'Fraunces', Georgia, serif` (Google Fonts, `index.html`) |
 
-**Panel admin** (desktop-first, sidebar fija de 200px): **sin Fraunces**, fondo
+**Panel admin** (desktop-first; sidebar de 200px desde `md` (768px), debajo es
+un drawer con botón hamburguesa en el header): **sin Fraunces**, fondo
 `#fafaf9`, sans del sistema, botones primarios `#1a1a1a`, bordes `#e8e8e8` /
 `#d0d0d0`. No uses crema/vino/Fraunces en pantallas admin nuevas. Excepciones
 existentes (no las copies como patrón): `SeccionUrlPublica` y
@@ -87,6 +115,11 @@ un hover con sombra en los CTA; es la excepción).
   `noUnusedParameters`, `noFallthroughCasesInSwitch`): el build falla.
 - **No uses `enum` ni parameter properties** (`erasableSyntaxOnly`). Usá union
   types de string, como `src/types/index.ts`.
+- **No formatees horas de atención con la zona del navegador.** Siempre la
+  `zonaHoraria` del local (`Intl` con `timeZone`, vía `utils/horarios.ts`): nada
+  de `toLocaleTimeString` / `getHours` sin zona para horarios o `proximoCambio`.
+- **No leas ni envíes `esActivo`, `esAbierto` ni `horarios` (texto libre).** Es
+  legado del backend; el estado sale de `estado` / `horario`.
 - **No conviertas `total()` / `cantidadTotal()` en valores.** Son métodos del
   store; llamalos dentro del selector — `useCartStore(s => s.total())`.
 - **No hagas que el interceptor de Axios lea el token desde el store.** Lee de
@@ -117,7 +150,7 @@ un hover con sombra en los CTA; es la excepción).
 - **No muevas `public/staticwebapp.config.json`** (fallback SPA de Azure Static
   Web Apps; tiene que terminar en la raíz de `dist/`) ni borres
   `public/og-image.png` (lo referencia `index.html`).
-- **No commitees `.env`** (está en `.gitignore`). `.env.production` sí está
-  versionado. Nunca pongas secretos en un `.env`: todo `VITE_*` termina en el
-  bundle público.
+- **No commitees `.env` ni `.env.development`** (están en `.gitignore`).
+  `.env.production` sí está versionado. Nunca pongas secretos en un `.env`: todo
+  `VITE_*` termina en el bundle público.
 - **No hagas commit ni push** salvo que se te pida explícitamente.

@@ -34,15 +34,17 @@ const tokenInicial = (() => {
   const t = localStorage.getItem(TOKEN_KEY)
   if (t && tokenVencido(t)) {
     localStorage.removeItem(TOKEN_KEY)
-    return { token: null, vencido: true }
+    return { token: null, vencidoEn: getTokenExpMs(t) }
   }
-  return { token: t, vencido: false }
+  return { token: t, vencidoEn: null }
 })()
 
 interface AuthState {
   token: string | null
   adminId: number | null
   sesionExpirada: boolean
+  /** Instante (ms) en que venció la sesión, para decir a qué hora dejó de recibir pedidos. */
+  sesionExpiradaEn: number | null
   guardarToken: (token: string) => void
   logout: () => void
   /** Único camino para cerrar sesión por vencimiento (timer, 401 del interceptor, carga inicial). */
@@ -53,11 +55,12 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: tokenInicial.token,
   adminId: tokenInicial.token ? parseAdminId(tokenInicial.token) : null,
-  sesionExpirada: tokenInicial.vencido,
+  sesionExpirada: tokenInicial.vencidoEn !== null,
+  sesionExpiradaEn: tokenInicial.vencidoEn,
 
   guardarToken: (token) => {
     localStorage.setItem(TOKEN_KEY, token)
-    set({ token, adminId: parseAdminId(token), sesionExpirada: false })
+    set({ token, adminId: parseAdminId(token), sesionExpirada: false, sesionExpiradaEn: null })
   },
 
   logout: () => {
@@ -66,9 +69,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   expirarSesion: () => {
-    if (get().token === null) return
+    const { token } = get()
+    if (token === null) return
+
+    // Otra pestaña pudo haber vuelto a iniciar sesión: ese token manda, no se lo pisa.
+    const guardado = localStorage.getItem(TOKEN_KEY)
+    if (guardado && guardado !== token && !tokenVencido(guardado)) {
+      set({ token: guardado, adminId: parseAdminId(guardado) })
+      return
+    }
+
+    // Un 401 con el token todavía vigente (revocado, reloj corrido) vence "ahora", no en su exp.
+    const ahora = Date.now()
+    const expMs = getTokenExpMs(token)
     localStorage.removeItem(TOKEN_KEY)
-    set({ token: null, adminId: null, sesionExpirada: true })
+    set({
+      token: null,
+      adminId: null,
+      sesionExpirada: true,
+      sesionExpiradaEn: expMs !== null && expMs <= ahora ? expMs : ahora,
+    })
   },
 
   isAuthenticated: () => {
@@ -76,3 +96,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return token !== null && !tokenVencido(token)
   },
 }))
+
+/**
+ * ¿Hay una sesión vigente? Para código que corre fuera de React (la factory de SignalR). Lee de
+ * `localStorage`, como el interceptor de Axios. Si el token ya venció cierra la sesión en vez de
+ * dejar que el hub reintente para siempre. Devuelve un booleano a propósito: el JWT no sale de acá.
+ */
+export function sesionVigente(): boolean {
+  const t = localStorage.getItem(TOKEN_KEY)
+  if (!t) return false
+  if (tokenVencido(t)) {
+    useAuthStore.getState().expirarSesion()
+    return false
+  }
+  return true
+}
