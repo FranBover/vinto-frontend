@@ -677,6 +677,32 @@ Siguiente. Detalles que importan:
   reconectar (con el diff de §7).
 - Las opciones de filtro de forma de entrega son `Delivery` y `Retira`.
 
+**Impresión de comanda y ticket (`ImpresionModal`).** Pensada para impresora
+térmica de rollo de 80 mm (probada con una HPRT de un local real). "Imprimir" abre
+un popup con el contenido y lo imprime; claves:
+
+- **Constantes arriba del archivo:** `ANCHO_PAPEL_MM = 80` (el único valor a tocar
+  para un rollo de 58 mm; todavía no es configurable por local),
+  `MARGEN_LATERAL_MM = 4` (→ 72 mm imprimibles), `MARGEN_CORTE_MM = 10`.
+- **El papel mide lo que mide el ticket.** Antes de `print()` se mide el alto real
+  del `#ticket` (a 72 mm de ancho) y se inyecta `@page { size: 80mm <alto+10>mm;
+  margin: 0 }`. Sin `@page` el navegador arma una hoja A4 con el ticket arriba y
+  la térmica escupe el largo de una A4.
+- **`margin: 0` es lo que saca el encabezado y el pie del navegador** (fecha,
+  `about:blank`, número de página): viven en el margen, y sin margen no hay dónde.
+  Verificado con las plantillas por defecto de Chrome (cero textos de más con
+  "Encabezados y pies" tildado). Ojo: una plantilla personalizada sin recorte
+  *sí* se dibuja encima del contenido; no es lo que usa el diálogo.
+- **Tipografía en pt y negro puro** (10 pt base, 11 ítems, 12 título, 14 total):
+  la térmica no imprime grises ni transparencias. `CSS_IMPRESION` fuerza
+  `#000`/`opacity: 1` con `!important` por si alguien agrega un gris después.
+- **Separadores con `border-top`, no con una fila de `─`:** 32 caracteres ya no
+  entran en 72 mm a 11 pt. Nombres largos parten la línea (`overflow-wrap:
+  anywhere`) y el importe de cada fila no se achica (`Fila`).
+- La vista previa del modal usa el mismo ancho y la misma tipografía que el papel.
+- El driver de la impresora tiene que tener el papel en "80 mm (rollo)": el
+  navegador pide el tamaño, pero el driver puede ignorarlo.
+
 **`MiLocalPage` — tres bloques con guardado independiente.** (1)
 `SeccionUrlPublica`, (2) `SeccionHorarios` (estado, cierre manual y horarios,
 §8.6) y (3) el formulario de datos del local, cuyo "Guardar cambios" (`PATCH

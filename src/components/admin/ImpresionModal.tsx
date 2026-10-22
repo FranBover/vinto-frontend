@@ -1,8 +1,84 @@
+import type { CSSProperties, ReactNode } from 'react'
 import type { ComandaResponseDTO, TicketResponseDTO } from '../../api/adminApi'
 
 type Props =
   | { tipo: 'comanda'; datos: ComandaResponseDTO; onClose: () => void }
   | { tipo: 'ticket';  datos: TicketResponseDTO;  onClose: () => void }
+
+// ── Papel térmico ─────────────────────────────────────────────────────────────
+// Ancho del rollo. Para un local con rollo de 58 mm alcanza con cambiar este valor (todavía no es
+// configurable por local).
+const ANCHO_PAPEL_MM = 80
+// Zona no imprimible a cada lado: de un rollo de 80 mm se imprimen 72.
+const MARGEN_LATERAL_MM = 4
+const ANCHO_CONTENIDO_MM = ANCHO_PAPEL_MM - 2 * MARGEN_LATERAL_MM
+// Papel en blanco al final, para que el corte no caiga sobre la última línea.
+const MARGEN_CORTE_MM = 10
+const MM_POR_PX = 25.4 / 96
+
+// Tamaños en pt: se imprimen a escala real. Todo en negro puro: la térmica no imprime grises ni
+// transparencias (o los imprime mal).
+const PT = { base: 10, item: 11, titulo: 12, total: 14 }
+const pt = (n: number) => `${n}pt`
+const NEGRO = '#000'
+const FUENTE: CSSProperties = {
+  fontFamily: 'monospace',
+  fontSize: pt(PT.base),
+  lineHeight: 1.35,
+  color: NEGRO,
+  // Nombres y direcciones largos parten la línea en vez de salirse del papel.
+  overflowWrap: 'anywhere',
+}
+
+// El popup no tiene Tailwind ni nada de la app: acá está todo lo que necesita para verse igual que
+// la vista previa del modal.
+const CSS_IMPRESION = `
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body { width: ${ANCHO_PAPEL_MM}mm; font-family: monospace; font-size: ${pt(PT.base)}; line-height: 1.35; }
+  p { margin: 0; }
+  #ticket { display: flow-root; width: ${ANCHO_CONTENIDO_MM}mm; margin: 0 auto; padding-top: 3mm; overflow-wrap: anywhere; }
+  /* Pase lo que pase con los estilos de adentro, nada sale gris ni transparente. */
+  #ticket, #ticket * { color: #000 !important; opacity: 1 !important; background: none !important; text-shadow: none !important; box-shadow: none !important; }
+`
+
+function escapar(s: string): string {
+  return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
+}
+
+/**
+ * Abre el ticket en una ventana y lo imprime. El papel de un rollo mide lo que mide el ticket: se
+ * mide el alto real del contenido (a 72 mm de ancho) y se lo pone en `@page`, con margin 0, que
+ * además deja sin lugar al encabezado y al pie que el navegador agrega ("about:blank", la fecha).
+ */
+function imprimir(titulo: string, contenido: HTMLElement) {
+  const win = window.open('', '_blank', 'width=500,height=700')
+  if (!win) return
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${escapar(titulo)}</title>
+<style>${CSS_IMPRESION}</style>
+</head>
+<body><div id="ticket">${contenido.innerHTML}</div></body>
+</html>`)
+  win.document.close()
+
+  const ticket = win.document.getElementById('ticket')
+  if (!ticket) {
+    win.close()
+    return
+  }
+  const altoMm = Math.ceil(ticket.getBoundingClientRect().height * MM_POR_PX) + MARGEN_CORTE_MM
+  const pagina = win.document.createElement('style')
+  pagina.textContent = `@page { size: ${ANCHO_PAPEL_MM}mm ${altoMm}mm; margin: 0 }`
+  win.document.head.appendChild(pagina)
+
+  win.focus()
+  win.print()
+  win.close()
+}
 
 function fmt(iso: string): string {
   if (!iso) return '—'
@@ -21,28 +97,46 @@ function money(n: number) {
   return '$' + n.toLocaleString('es-AR', { minimumFractionDigits: 2 })
 }
 
-const SEP = '─'.repeat(32)
+// Separador: un borde y no una fila de caracteres, así ocupa siempre el ancho exacto del papel.
+function Sep() {
+  return <div style={{ borderTop: `2px dashed ${NEGRO}`, margin: '2mm 0' }} />
+}
+
+// Fila con texto a la izquierda y un importe a la derecha: el importe no se parte ni se achica, el
+// texto cede y parte la línea.
+function Fila({ izq, der, style }: { izq: ReactNode; der?: ReactNode; style?: CSSProperties }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '2mm', ...style }}>
+      <span style={{ minWidth: 0 }}>{izq}</span>
+      <span style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>{der}</span>
+    </div>
+  )
+}
+
+const SANGRIA = '3mm'
+const NEGRITA: CSSProperties = { fontWeight: 700 }
+const LINEA_ITEM: CSSProperties = { fontWeight: 700, fontSize: pt(PT.item) }
 
 function ComandaContent({ d }: { d: ComandaResponseDTO }) {
   return (
     <div>
-      <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+      <p style={{ ...NEGRITA, fontSize: pt(PT.titulo), marginBottom: '1mm' }}>
         COMANDA #{d.codigoSeguimiento}
       </p>
       <p>{fmt(d.fecha)}</p>
-      <p>{d.formaEntrega === 'Delivery' ? 'Delivery' : 'Retiro en local'}</p>
-      <p style={{ marginTop: 4 }}><strong>{d.nombreCliente}</strong></p>
+      <p style={NEGRITA}>{d.formaEntrega === 'Delivery' ? 'Delivery' : 'Retiro en local'}</p>
+      <p style={{ ...NEGRITA, marginTop: '1mm' }}>{d.nombreCliente}</p>
       {d.direccionCliente && <p>{d.direccionCliente}</p>}
-      {d.referenciaDireccion && <p style={{ fontSize: 12, color: '#555' }}>Ref: {d.referenciaDireccion}</p>}
-      <p style={{ margin: '10px 0', letterSpacing: 1 }}>{SEP}</p>
+      {d.referenciaDireccion && <p>Ref: {d.referenciaDireccion}</p>}
+      <Sep />
       {d.items.map((item, i) => (
-        <div key={i} style={{ marginBottom: 6 }}>
-          <p style={{ fontWeight: 600 }}>{item.cantidad}x {item.nombreProducto}</p>
+        <div key={i} style={{ marginBottom: '2mm' }}>
+          <p style={LINEA_ITEM}>{item.cantidad}x {item.nombreProducto}</p>
           {item.varianteDescripcion && (
-            <p style={{ paddingLeft: 12, fontSize: 12 }}>{item.varianteDescripcion}</p>
+            <p style={{ paddingLeft: SANGRIA }}>{item.varianteDescripcion}</p>
           )}
           {item.extras.map((e, j) => (
-            <p key={j} style={{ paddingLeft: 12 }}>+ {e}</p>
+            <p key={j} style={{ paddingLeft: SANGRIA }}>+ {e}</p>
           ))}
         </div>
       ))}
@@ -53,70 +147,60 @@ function ComandaContent({ d }: { d: ComandaResponseDTO }) {
 function TicketContent({ d }: { d: TicketResponseDTO }) {
   return (
     <div>
-      <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 2 }}>
+      <p style={{ ...NEGRITA, fontSize: pt(PT.titulo), marginBottom: '1mm' }}>
         TICKET #{d.codigoSeguimiento}
       </p>
-      <p style={{ fontWeight: 600 }}>{d.nombreLocal}</p>
+      <p style={{ ...NEGRITA, fontSize: pt(PT.item) }}>{d.nombreLocal}</p>
       <p>{d.telefono}</p>
-      <p style={{ marginTop: 4 }}>{fmt(d.fecha)}</p>
-      <p style={{ margin: '10px 0', letterSpacing: 1 }}>{SEP}</p>
-      <p><strong>{d.nombreCliente}</strong> — {d.telefonoCliente}</p>
-      <p>{d.formaEntrega === 'Delivery' ? 'Delivery' : 'Retiro en local'}</p>
+      <p style={{ marginTop: '1mm' }}>{fmt(d.fecha)}</p>
+      <Sep />
+      <p><span style={NEGRITA}>{d.nombreCliente}</span> — {d.telefonoCliente}</p>
+      <p style={NEGRITA}>{d.formaEntrega === 'Delivery' ? 'Delivery' : 'Retiro en local'}</p>
       {d.direccionCliente && <p>{d.direccionCliente}</p>}
-      {d.referenciaDireccion && <p style={{ fontSize: 12, color: '#555' }}>Ref: {d.referenciaDireccion}</p>}
-      <p style={{ marginTop: 4 }}>Pago: {d.formaPago}</p>
-      <p style={{ margin: '10px 0', letterSpacing: 1 }}>{SEP}</p>
+      {d.referenciaDireccion && <p>Ref: {d.referenciaDireccion}</p>}
+      <p style={{ marginTop: '1mm' }}>Pago: {d.formaPago}</p>
+      <Sep />
       {d.items.map((item, i) => (
-        <div key={i} style={{ marginBottom: 6 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600 }}>{item.cantidad}x {item.nombreProducto}</span>
-            <span>{money(item.subtotal)}</span>
-          </div>
+        <div key={i} style={{ marginBottom: '2mm' }}>
+          <Fila
+            style={LINEA_ITEM}
+            izq={`${item.cantidad}x ${item.nombreProducto}`}
+            der={money(item.subtotal)}
+          />
           {item.varianteDescripcion && (
-            <p style={{ paddingLeft: 12, fontSize: 12, margin: 0 }}>{item.varianteDescripcion}</p>
+            <p style={{ paddingLeft: SANGRIA }}>{item.varianteDescripcion}</p>
           )}
           {item.extras.map((e, j) => (
-            <div key={j} style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 12, fontSize: 12 }}>
-              <span>+ {e.nombre}</span>
-              {e.precioAdicional > 0 && <span>{money(e.precioAdicional)}</span>}
-            </div>
+            <Fila
+              key={j}
+              style={{ paddingLeft: SANGRIA }}
+              izq={`+ ${e.nombre}`}
+              der={e.precioAdicional > 0 ? money(e.precioAdicional) : null}
+            />
           ))}
         </div>
       ))}
-      <p style={{ margin: '10px 0', letterSpacing: 1 }}>{SEP}</p>
+      <Sep />
       {((d.montoDescuentoProductos ?? 0) > 0 || (d.montoDescuentoCupon ?? 0) > 0) && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Subtotal sin descuentos</span>
-            <span>{money(d.subtotalSinDescuentos ?? 0)}</span>
-          </div>
+          <Fila izq="Subtotal sin descuentos" der={money(d.subtotalSinDescuentos ?? 0)} />
           {(d.montoDescuentoProductos ?? 0) > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Desc. productos</span>
-              <span>-{money(d.montoDescuentoProductos ?? 0)}</span>
-            </div>
+            <Fila izq="Desc. productos" der={`-${money(d.montoDescuentoProductos ?? 0)}`} />
           )}
           {(d.montoDescuentoCupon ?? 0) > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Cupón {d.codigoCupon}</span>
-              <span>-{money(d.montoDescuentoCupon ?? 0)}</span>
-            </div>
+            <Fila izq={`Cupón ${d.codigoCupon}`} der={`-${money(d.montoDescuentoCupon ?? 0)}`} />
           )}
         </>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <span>Subtotal</span><span>{money(d.subtotal)}</span>
-      </div>
-      {d.costoEnvio > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Envío</span><span>{money(d.costoEnvio)}</span>
-        </div>
-      )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15, marginTop: 4 }}>
-        <span>TOTAL</span><span>{money(d.total)}</span>
-      </div>
+      <Fila izq="Subtotal" der={money(d.subtotal)} />
+      {d.costoEnvio > 0 && <Fila izq="Envío" der={money(d.costoEnvio)} />}
+      <Fila
+        style={{ ...NEGRITA, fontSize: pt(PT.total), marginTop: '1mm' }}
+        izq="TOTAL"
+        der={money(d.total)}
+      />
       {d.montoPagoEfectivo != null && (
-        <p style={{ marginTop: 8 }}>
+        <p style={{ ...NEGRITA, marginTop: '2mm' }}>
           Paga con {money(d.montoPagoEfectivo)}
           {d.vuelto != null && d.vuelto > 0 && ` — Vuelto: ${money(d.vuelto)}`}
         </p>
@@ -131,22 +215,7 @@ export default function ImpresionModal(props: Props) {
   const handlePrint = () => {
     const content = document.getElementById('vinto-print-content')
     if (!content) return
-    const win = window.open('', '_blank', 'width=500,height=700')
-    if (!win) return
-    win.document.write(`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  body { font-family: monospace; font-size: 13px; line-height: 1.6; color: #1a1a1a; padding: 16px; margin: 0; }
-</style>
-</head>
-<body>${content.innerHTML}</body>
-</html>`)
-    win.document.close()
-    win.focus()
-    win.print()
-    win.close()
+    imprimir(`${tipo === 'comanda' ? 'Comanda' : 'Ticket'} #${datos.codigoSeguimiento}`, content)
   }
 
   return (
@@ -214,21 +283,17 @@ export default function ImpresionModal(props: Props) {
           </div>
         </div>
 
-        {/* Print content */}
-        <div
-          id="vinto-print-content"
-          style={{
-            padding: '20px 24px',
-            fontFamily: 'monospace',
-            fontSize: 13,
-            lineHeight: 1.6,
-            color: '#1a1a1a',
-          }}
-        >
-          {tipo === 'comanda'
-            ? <ComandaContent d={datos as ComandaResponseDTO} />
-            : <TicketContent  d={datos as TicketResponseDTO}  />
-          }
+        {/* Print content: mismo ancho y tipografía que el papel, así lo que se ve es lo que sale */}
+        <div style={{ padding: '20px 0' }}>
+          <div
+            id="vinto-print-content"
+            style={{ ...FUENTE, width: `${ANCHO_CONTENIDO_MM}mm`, margin: '0 auto' }}
+          >
+            {tipo === 'comanda'
+              ? <ComandaContent d={datos as ComandaResponseDTO} />
+              : <TicketContent  d={datos as TicketResponseDTO}  />
+            }
+          </div>
         </div>
       </div>
     </>
