@@ -52,24 +52,28 @@ src/
 │   ├── usePedidosHub.ts  conexión SignalR
 │   ├── useAlertaSesionExpirada.ts  pitido + título de pestaña al vencer la sesión (§7)
 │   ├── useEstadoLocal.ts abierto/cerrado de la tienda, se refresca solo (§8.6)
+│   ├── useWakeLock.ts    pantalla encendida mientras el sonido de pedidos está activado (§7)
 │   └── useReveal.tsx     animación de entrada (solo landing)
 ├── pages/
 │   ├── client/     flujo público de compra
 │   ├── admin/      panel
 │   └── marketing/  LandingPage
-├── store/          Zustand: auth, cart, menu, notifications
+├── store/          Zustand: auth, cart, menu, notifications, sonido
 ├── types/index.ts  modelos y DTOs del dominio (los de admin, en adminApi.ts)
 ├── utils/horarios.ts  formateo de horarios y estado, compartido panel/tienda (§8.6)
 ├── utils/sesion.ts    "a las 22:03" / "mañana a las 11:00" del vencimiento de la sesión (§7)
+├── utils/audio.ts          tocarNota() de Web Audio, compartida por la alarma y el aviso (§7)
+├── utils/sonidoPedidos.ts  campanadas, AudioContext único y desbloqueo (§7)
+├── utils/avisoPedidos.ts   avisarPedidosNuevos(): sonido + título de la pestaña (§7)
 ├── config.ts       URLs de entorno + resolveImageUrl + constantes de marketing
 ├── index.css       @import "tailwindcss" + una animación
 └── main.tsx        createRoot + StrictMode
 public/             og-image.png, íconos, staticwebapp.config.json
 ```
 
-`utils/` contiene dos archivos: `horarios.ts` (siempre en la zona del local) y
-`sesion.ts` (en la zona del dispositivo, a propósito: es el reloj de quien usa el
-panel, no un horario de atención). No existe `components/ui/` (en el disco hay un
+`horarios.ts` (de `utils/`) opera siempre en la zona del local; `sesion.ts` en la
+zona del dispositivo, a propósito: es el reloj de quien usa el panel, no un
+horario de atención. Los otros tres son el aviso sonoro de pedidos (§7). No existe `components/ui/` (en el disco hay un
 directorio vacío con ese nombre; git no lo versiona).
 
 ---
@@ -376,6 +380,9 @@ Es el puente entre SignalR y la UI. Guarda:
 - `avisarPedidosPerdidos(payloads)`: agrega toasts de pedidos que entraron
   durante una caída. **A propósito no toca `ultimoNuevoPedido`**, para no
   disparar un refetch adicional.
+- `emitirNuevoPedido` y `avisarPedidosPerdidos` además llaman a
+  `avisarPedidosNuevos()` (sonido + título de la pestaña, §7). `PagoConfirmado`
+  no suena.
 
 ---
 
@@ -462,6 +469,72 @@ SignalR no reenvía lo emitido mientras el cliente estaba caído. Al subir
 
 Los toasts se apilan en un contenedor `position: fixed` abajo a la derecha,
 renderizado por `AdminLayout`.
+
+### Aviso sonoro de pedido nuevo
+
+El dueño puede no estar mirando la pantalla, así que un pedido nuevo suena, cambia
+el título de la pestaña y mantiene la pantalla encendida. Todo vive donde vive el
+hub (`AdminLayout`), no en `PedidosPage`. **Hay un solo lugar para controlarlo:**
+`SonidoControl`, en el header, a la izquierda del chip de conexión (no hay nada en
+Mi local).
+
+- **Cuándo suena:** `NuevoPedido` del hub (`emitirNuevoPedido`) y los pedidos que
+  el refetch de `PedidosPage` encuentra tras una reconexión
+  (`avisarPedidosPerdidos`). No suena por `PagoConfirmado`, cambios de estado ni
+  acciones del propio dueño. **El refetch al reconectar solo existe en
+  `PedidosPage`**: un pedido que entra durante un corte mientras el dueño está en
+  otra pantalla no suena (ni tiene toast) al volver la conexión.
+- **El sonido (`utils/sonidoPedidos.ts`):** Web Audio, sin archivos. Campanadas de
+  ~4 s (dos "ding-dong" y un acorde final, sinusoides con parciales inarmónicos),
+  distintas del pitido cuadrado de "sesión vencida". Una sola reproducción por
+  ráfaga: mientras suena (`DURACION_SONIDO_MS`) otro pedido no se encima ni se
+  encola. El pico mide ~-2.5 dBFS; si se tocan los volúmenes hay que volver a
+  medirlo (el acorde suma tres voces). `utils/audio.ts` (`tocarNota`) es la parte
+  compartida con la alarma de sesión.
+- **Un solo `AudioContext` por carga de página.** El panel remonta `AdminLayout` en
+  cada navegación; el desbloqueo no puede perderse con él. El estado
+  (`desbloqueado`) sale del `onstatechange` del contexto y va a `sonidoStore`.
+- **Volumen:** una `GainNode` maestra entre las campanadas y `destination`
+  (`salida` en `utils/sonidoPedidos.ts`). El slider cambia `sonidoStore.volumen`
+  (de 10 % a 100 %, por defecto 100 %: solo baja) y la ganancia lo sigue en vivo,
+  así que "Probar sonido" suena con ese volumen y se puede ajustar mientras suena.
+  A 100 % el sonido es el original.
+- **El control (`SonidoControl`, en el header de `AdminLayout`):** ícono de parlante
+  con tres estados: activado, desactivado (tachado, gris) y "falta tocar"
+  (activado pero el audio sigue bloqueado: cuadradito rojo pulsando). Al tocarlo
+  abre un panel con el interruptor, el volumen, "Probar sonido" y una línea sobre
+  que el volumen final depende también del de la computadora. Cierra con Escape o
+  un toque afuera. La preferencia ("Sonido de pedidos", `localStorage`
+  `vinto_sonido_pedidos`) y el volumen (`vinto_sonido_volumen`) son por
+  dispositivo, se guardan al instante y no van con "Guardar cambios".
+- **Desbloqueo:** el navegador no deja sonar hasta que el usuario toca la página.
+  Con el sonido activado y el audio bloqueado, `SonidoControl` muestra un globo
+  anclado bajo el ícono, con flechita: "Tocá para activar el sonido de pedidos" y
+  un botón "Activar". No bloquea el panel; cualquier clic o tecla también
+  desbloquea y el globo desaparece solo. **Se escucha `click` y no `pointerdown`**:
+  el globo desaparece al desbloquear y, con `pointerdown`, el clic caería sobre lo
+  que quedó debajo (además, en touch el `pointerdown` no habilita el audio). Si ya
+  hubo interacción en la página (venir del login), se desbloquea solo.
+- **Anclaje (`useAnclaje`):** globo y panel cuelgan del header (sticky = bloque
+  contenedor del `absolute`) y se posicionan **a partir del ícono**, acotados a la
+  pantalla con 16 px de margen; la flechita apunta al centro del ícono. No sirve
+  alinearlos al borde derecho del header: el ícono queda lejos de él cuando el chip
+  o las acciones de la pantalla (p. ej. "Guardar cambios") son anchos. Mide el DOM y
+  escribe `left` directo, y se vuelve a medir con un `ResizeObserver` sobre los
+  ancestros del ícono.
+- **Celular:** el ícono sigue en el header junto a la hamburguesa. Para que entre sin
+  comerse el título (a 360 px con las acciones de Mi local, el título quedaba en 0 px
+  y el ícono pisaba la hamburguesa), por debajo de `sm` (640 px) `ConexionChip`
+  muestra solo el cuadrado de color; el texto queda `sr-only` y, sin conexión, el
+  banner de abajo lo explica.
+- **Título de la pestaña:** si el pedido entra con la pestaña oculta o sin foco, pasa
+  a "(N) Nuevo pedido · Vinto" hasta que el dueño vuelve. El contador vive en
+  `utils/avisoPedidos.ts` (fuera de React) para sobrevivir al remonte del layout.
+  Aplica aunque el sonido esté desactivado. `tituloBase()` le da a la alarma de
+  sesión el título sin prefijo.
+- **Wake Lock (`useWakeLock`):** mientras el sonido esté activado se pide que la
+  pantalla no se apague; se vuelve a pedir al volver a la pestaña (el navegador lo
+  suelta al ocultarla). Sin soporte o si lo rechaza, no hace nada.
 
 ### Vencimiento de la sesión en pleno servicio
 

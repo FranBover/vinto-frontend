@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { avisarPedidosNuevos } from '../utils/avisoPedidos'
 
 // ── Tipos de payload de eventos SignalR ──────────────────────────────────────
 
@@ -44,7 +45,9 @@ interface NotificationsState {
   // Se incrementa tras una reconexión real del hub (no en la conexión inicial)
   reconexiones: number
 
-  // Acciones para emitir eventos (las llama el hook desde AdminLayout)
+  // Acciones para emitir eventos (las llama el hook desde AdminLayout).
+  // Un pedido nuevo (emitirNuevoPedido, avisarPedidosPerdidos) además suena y cambia el título de la
+  // pestaña vía avisarPedidosNuevos; PagoConfirmado no.
   emitirNuevoPedido: (payload: NuevoPedidoPayload) => void
   emitirPagoConfirmado: (payload: PagoConfirmadoPayload) => void
   emitirReconexion: () => void
@@ -75,6 +78,7 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
       nuevoPedido: p,
     }))
     set((state) => ({ toasts: [...state.toasts, ...nuevos] }))
+    avisarPedidosNuevos(payloads.length)
   },
 
   emitirNuevoPedido: (payload) => {
@@ -87,6 +91,7 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
       toasts: [...state.toasts, toast],
       ultimoNuevoPedido: payload,
     }))
+    avisarPedidosNuevos()
   },
 
   emitirPagoConfirmado: (payload) => {

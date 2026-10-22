@@ -4,9 +4,12 @@ import NuevoPedidoToast from '../NuevoPedidoToast'
 import PagoConfirmadoToast from './PagoConfirmadoToast'
 import MercadoPagoStatusBanner from './MercadoPagoStatusBanner'
 import SesionPorVencerBanner from './SesionPorVencerBanner'
+import SonidoControl from './SonidoControl'
 import { ConexionBanner, ConexionChip } from './ConexionIndicador'
 import { usePedidosHub } from '../../hooks/usePedidosHub'
+import { useWakeLock } from '../../hooks/useWakeLock'
 import { useAuthStore } from '../../store/authStore'
+import { useSonidoStore } from '../../store/sonidoStore'
 import {
   useNotificationsStore,
   type NuevoPedidoPayload,
@@ -46,6 +49,10 @@ export default function AdminLayout({ title, subtitle, actions, children }: Prop
     onReconectado: emitirReconexion,
   })
 
+  // Con el sonido activado el panel es una consola de avisos: la pantalla no tiene que apagarse.
+  const sonidoActivado = useSonidoStore(s => s.activado)
+  useWakeLock(sonidoActivado)
+
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: '#fafaf9' }}>
       <Sidebar abierto={menuAbierto} onCerrar={cerrarMenu} />
@@ -83,6 +90,7 @@ export default function AdminLayout({ title, subtitle, actions, children }: Prop
             </div>
           </div>
           <div className="flex items-center gap-3 md:gap-5 flex-shrink-0">
+            <SonidoControl />
             <ConexionChip state={connectionState} />
             {actions && <div className="flex items-center gap-3">{actions}</div>}
           </div>

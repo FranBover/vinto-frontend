@@ -24,7 +24,10 @@ export function ConexionChip({ state }: Props) {
         className={reconectando ? 'animate-pulse' : undefined}
         style={{ width: 8, height: 8, backgroundColor: color, display: 'inline-block' }}
       />
-      {texto}
+      {/* En el celular el header no tiene lugar para el texto (con el control de sonido y las acciones
+          de la pantalla el título desaparece): queda el cuadrado de color y, si no hay conexión, el
+          banner de abajo lo explica. El texto sigue para lectores de pantalla. */}
+      <span className="max-sm:sr-only">{texto}</span>
     </span>
   )
 }

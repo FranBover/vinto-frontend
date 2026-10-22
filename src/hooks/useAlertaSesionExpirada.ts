@@ -1,4 +1,6 @@
 import { useEffect } from 'react'
+import { tocarNota } from '../utils/audio'
+import { tituloBase } from '../utils/avisoPedidos'
 
 // Solo suena si el vencimiento es reciente: quien abre el panel horas después ya está mirando
 // la pantalla y el cartel del login alcanza.
@@ -12,17 +14,14 @@ const FRECUENCIAS = [880, 660, 880]
 function sonarAviso(ctx: AudioContext) {
   const inicio = ctx.currentTime
   FRECUENCIAS.forEach((frecuencia, i) => {
-    const desde = inicio + i * 0.25
-    const osc = ctx.createOscillator()
-    const volumen = ctx.createGain()
-    osc.type = 'square'
-    osc.frequency.value = frecuencia
-    volumen.gain.setValueAtTime(0.0001, desde)
-    volumen.gain.exponentialRampToValueAtTime(0.2, desde + 0.02)
-    volumen.gain.exponentialRampToValueAtTime(0.0001, desde + 0.18)
-    osc.connect(volumen).connect(ctx.destination)
-    osc.start(desde)
-    osc.stop(desde + 0.2)
+    tocarNota(ctx, ctx.destination, {
+      frecuencia,
+      tipo: 'square',
+      desde: inicio + i * 0.25,
+      ataque: 0.02,
+      decaimiento: 0.16,
+      volumen: 0.2,
+    })
   })
 }
 
@@ -35,7 +34,8 @@ export function useAlertaSesionExpirada(expiradaEn: number | null) {
   useEffect(() => {
     if (expiradaEn === null || Date.now() - expiradaEn > VENTANA_MS) return
 
-    const tituloOriginal = document.title
+    // Sin el prefijo "(N) Nuevo pedido" si el panel venía avisando pedidos sin ver.
+    const tituloOriginal = tituloBase()
     document.title = TITULO
 
     let ctx: AudioContext | null = null

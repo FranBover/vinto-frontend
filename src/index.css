@@ -13,3 +13,29 @@
 .vinto-float {
   animation: vinto-float 6s ease-in-out infinite;
 }
+
+/* Globo y panel del control de sonido del panel admin: aparecen bajando apenas, con un leve rebote. */
+@keyframes sonido-entrada {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sonido-entrada {
+  animation: sonido-entrada 0.35s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sonido-entrada {
+    animation: none;
+  }
+}
